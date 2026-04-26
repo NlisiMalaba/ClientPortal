@@ -73,6 +73,10 @@ builder.Services.AddExceptionHandler<GlobalExceptionHandler>();
 builder.Services.AddApplication();
 builder.Services.AddHttpContextAccessor();
 builder.Services.AddScoped<ICurrentTenant, HttpCurrentTenant>();
+builder.Services.AddScoped<ITenantDomainLookup, NullTenantDomainLookup>();
+builder.Services.AddScoped<ITenantResolver, SubdomainTenantResolver>();
+builder.Services.AddScoped<ITenantResolver, CustomDomainTenantResolver>();
+builder.Services.AddScoped<TenantMiddleware>();
 
 var healthChecksBuilder = builder.Services.AddHealthChecks();
 string? postgresConnectionString = builder.Configuration.GetConnectionString("Postgres");
@@ -132,6 +136,7 @@ app.UseSerilogRequestLogging(options =>
 });
 app.UseHttpsRedirection();
 app.UseCors(CorsPolicyNames.Default);
+app.UseMiddleware<TenantMiddleware>();
 app.MapHealthChecks("/health", new HealthCheckOptions());
 
 var summaries = new[]
@@ -156,7 +161,8 @@ app.MapGet("/weatherforecast", () =>
             ["count"] = forecast.Length
         });
 })
-.WithName("GetWeatherForecast");
+.WithName("GetWeatherForecast")
+.RequireTenant();
 
 app.Run();
 
