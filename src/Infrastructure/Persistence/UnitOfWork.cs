@@ -1,4 +1,6 @@
 using Application.Abstractions;
+using Domain;
+using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Storage;
 
 namespace Infrastructure.Persistence;
@@ -6,16 +8,40 @@ namespace Infrastructure.Persistence;
 public sealed class UnitOfWork : IUnitOfWork, IAsyncDisposable
 {
     private readonly TenantDbContext _tenantDbContext;
+    private readonly IDomainEventDispatcher _domainEventDispatcher;
     private IDbContextTransaction? _currentTransaction;
 
-    public UnitOfWork(TenantDbContext tenantDbContext)
+    public UnitOfWork(TenantDbContext tenantDbContext, IDomainEventDispatcher domainEventDispatcher)
     {
         _tenantDbContext = tenantDbContext;
+        _domainEventDispatcher = domainEventDispatcher;
     }
 
-    public Task<int> SaveChangesAsync(CancellationToken cancellationToken = default)
+    public async Task<int> SaveChangesAsync(CancellationToken cancellationToken = default)
     {
-        return _tenantDbContext.SaveChangesAsync(cancellationToken);
+        List<IHasDomainEvents> aggregatesWithEvents = _tenantDbContext.ChangeTracker
+            .Entries<IHasDomainEvents>()
+            .Select(entry => entry.Entity)
+            .Where(aggregate => aggregate.DomainEvents.Count > 0)
+            .ToList();
+
+        List<IDomainEvent> domainEvents = aggregatesWithEvents
+            .SelectMany(aggregate => aggregate.DomainEvents)
+            .ToList();
+
+        int rowsAffected = await _tenantDbContext.SaveChangesAsync(cancellationToken);
+
+        foreach (IHasDomainEvents aggregate in aggregatesWithEvents)
+        {
+            aggregate.ClearDomainEvents();
+        }
+
+        foreach (IDomainEvent domainEvent in domainEvents)
+        {
+            await _domainEventDispatcher.DispatchAsync(domainEvent, cancellationToken);
+        }
+
+        return rowsAffected;
     }
 
     public async Task BeginTransactionAsync(CancellationToken cancellationToken = default)

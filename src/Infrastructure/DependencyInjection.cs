@@ -1,3 +1,4 @@
+using Application.Abstractions;
 using Infrastructure.Persistence;
 using Infrastructure.Persistence.Public;
 using Infrastructure.Persistence.Security;
@@ -13,7 +14,9 @@ public static class DependencyInjection
     {
         services.AddDbContext<TenantDbContext>();
         services.AddDbContext<PublicDbContext>();
+        services.AddScoped<IDomainEventDispatcher, DomainEventDispatcher>();
         services.AddScoped<ITenantDbContextFactory, TenantDbContextFactory>();
+        services.AddScoped<IUnitOfWork, UnitOfWork>();
         services.AddScoped<ITenantProvisioner, TenantProvisioner>();
         services.AddScoped<IDbInitializer, DbInitializer>();
         services.AddScoped<ITenantRlsPolicyManager, TenantRlsPolicyManager>();
