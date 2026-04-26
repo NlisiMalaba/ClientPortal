@@ -1,5 +1,7 @@
 using Application;
 using Application.Abstractions;
+using Application.Auth.Abstractions;
+using Api.Auth;
 using Api.Contracts;
 using Api.HealthChecks;
 using Api.Middleware;
@@ -8,13 +10,18 @@ using Infrastructure;
 using Infrastructure.Persistence;
 using Microsoft.AspNetCore.Authentication;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
+using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Diagnostics.HealthChecks;
 using Microsoft.AspNetCore.OpenApi;
+using Microsoft.AspNetCore.RateLimiting;
 using Microsoft.Extensions.Diagnostics.HealthChecks;
+using Microsoft.IdentityModel.Tokens;
 using Microsoft.OpenApi;
 using Scalar.AspNetCore;
 using Serilog;
 using Serilog.Events;
+using System.Security.Cryptography;
+using System.Threading.RateLimiting;
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -36,7 +43,57 @@ builder.Services.AddOpenApi("v1", options =>
 });
 
 builder.Services.AddAuthentication(JwtBearerDefaults.AuthenticationScheme)
-    .AddJwtBearer();
+    .AddJwtBearer(options =>
+    {
+        IConfigurationSection jwtSection = builder.Configuration.GetSection("Jwt");
+        string issuer = jwtSection["Issuer"] ?? string.Empty;
+        string audience = jwtSection["Audience"] ?? string.Empty;
+        string publicKeyPem = jwtSection["PublicKeyPem"] ?? string.Empty;
+
+        RsaSecurityKey publicKey = JwtKeyUtilities.CreatePublicKey(publicKeyPem);
+        options.TokenValidationParameters = new TokenValidationParameters
+        {
+            ValidateIssuerSigningKey = true,
+            IssuerSigningKey = publicKey,
+            ValidateIssuer = true,
+            ValidIssuer = issuer,
+            ValidateAudience = true,
+            ValidAudience = audience,
+            ValidateLifetime = true,
+            ClockSkew = TimeSpan.Zero,
+            NameClaimType = "userId",
+            RoleClaimType = "role"
+        };
+    });
+builder.Services.AddAuthorization(options =>
+{
+    options.FallbackPolicy = new AuthorizationPolicyBuilder()
+        .RequireAuthenticatedUser()
+        .Build();
+
+    options.AddPolicy(AuthorizationPolicies.RequireOwner, policy => policy.RequireRole("Owner"));
+    options.AddPolicy(AuthorizationPolicies.RequireAdmin, policy => policy.RequireRole("Admin"));
+    options.AddPolicy(AuthorizationPolicies.RequireStaff, policy => policy.RequireRole("Staff"));
+    options.AddPolicy(AuthorizationPolicies.RequireAnyStaff, policy => policy.RequireRole("Owner", "Admin", "Staff"));
+    options.AddPolicy(AuthorizationPolicies.RequireClientUser, policy => policy.RequireRole("ClientUser"));
+});
+builder.Services.AddRateLimiter(options =>
+{
+    options.RejectionStatusCode = StatusCodes.Status429TooManyRequests;
+    options.AddPolicy(RateLimitPolicies.AuthLogin, context =>
+    {
+        string partitionKey = context.Connection.RemoteIpAddress?.ToString() ?? "unknown";
+        return RateLimitPartition.GetFixedWindowLimiter(
+            partitionKey,
+            _ => new FixedWindowRateLimiterOptions
+            {
+                PermitLimit = 5,
+                Window = TimeSpan.FromMinutes(1),
+                QueueLimit = 0,
+                AutoReplenishment = true
+            });
+    });
+});
 builder.Services.AddCors(options =>
 {
     options.AddPolicy(CorsPolicyNames.Default, policy =>
@@ -72,9 +129,16 @@ builder.Services.AddCors(options =>
 });
 builder.Services.AddProblemDetails();
 builder.Services.AddExceptionHandler<GlobalExceptionHandler>();
+builder.Services.Configure<RefreshTokenCookieOptions>(options =>
+{
+    IConfigurationSection section = builder.Configuration.GetSection(RefreshTokenCookieOptions.SectionName);
+    options.Name = section["Name"] ?? "refreshToken";
+    options.ExpiryDays = int.TryParse(section["ExpiryDays"], out int expiryDays) ? expiryDays : 7;
+});
 builder.Services.AddApplication();
 builder.Services.AddInfrastructure(builder.Configuration);
 builder.Services.AddHttpContextAccessor();
+builder.Services.AddScoped<IRefreshTokenCookieStore, HttpContextRefreshTokenCookieStore>();
 builder.Services.AddScoped<ICurrentTenant, HttpCurrentTenant>();
 builder.Services.AddScoped<ITenantDomainLookup, NullTenantDomainLookup>();
 builder.Services.AddScoped<ITenantResolver, SubdomainTenantResolver>();
@@ -146,7 +210,11 @@ app.UseSerilogRequestLogging(options =>
 app.UseHttpsRedirection();
 app.UseCors(CorsPolicyNames.Default);
 app.UseMiddleware<TenantMiddleware>();
+app.UseRateLimiter();
+app.UseAuthentication();
+app.UseAuthorization();
 app.MapHealthChecks("/health", new HealthCheckOptions());
+app.MapAuthEndpoints();
 
 var summaries = new[]
 {
@@ -221,4 +289,29 @@ internal sealed class BearerSecuritySchemeTransformer(IAuthenticationSchemeProvi
 internal static class CorsPolicyNames
 {
     public const string Default = "DefaultCorsPolicy";
+}
+
+internal static class AuthorizationPolicies
+{
+    public const string RequireOwner = nameof(RequireOwner);
+    public const string RequireAdmin = nameof(RequireAdmin);
+    public const string RequireStaff = nameof(RequireStaff);
+    public const string RequireAnyStaff = nameof(RequireAnyStaff);
+    public const string RequireClientUser = nameof(RequireClientUser);
+}
+
+internal static class JwtKeyUtilities
+{
+    public static RsaSecurityKey CreatePublicKey(string publicKeyPem)
+    {
+        if (string.IsNullOrWhiteSpace(publicKeyPem))
+        {
+            throw new InvalidOperationException("Jwt:PublicKeyPem must be configured.");
+        }
+
+        string normalizedPem = publicKeyPem.Replace("\\n", "\n").Trim();
+        RSA rsa = RSA.Create();
+        rsa.ImportFromPem(normalizedPem);
+        return new RsaSecurityKey(rsa);
+    }
 }

@@ -1,5 +1,6 @@
 .cursor/
-planning/
+planning/*
+planning/02-tasks.md
 .env.example
 
 # Build output
