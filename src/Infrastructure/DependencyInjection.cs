@@ -1,4 +1,5 @@
 using Application.Abstractions;
+using Application.Clients.Abstractions;
 using Application.Auth.Abstractions;
 using Infrastructure.Auth;
 using Infrastructure.Persistence;
@@ -36,6 +37,7 @@ public static class DependencyInjection
         services.AddDbContext<TenantDbContext>();
         services.AddDbContext<PublicDbContext>();
         services.AddScoped<IDomainEventDispatcher, DomainEventDispatcher>();
+        services.AddScoped<IClientRepository, ClientRepository>();
         services.AddSingleton<IJwtTokenService, JwtTokenService>();
         services.AddSingleton<IRefreshTokenService, Argon2RefreshTokenService>();
         services.AddScoped<ITenantDbContextFactory, TenantDbContextFactory>();
