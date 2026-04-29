@@ -2,7 +2,7 @@ using Shared;
 
 namespace Domain;
 
-public sealed class ClientRequest : Entity<Guid>
+public sealed class ClientRequest : AggregateRoot<Guid>
 {
     public Guid ClientId { get; private set; }
 
@@ -47,7 +47,9 @@ public sealed class ClientRequest : Entity<Guid>
         ClientRequestStatus status = ClientRequestStatus.Submitted,
         ClientRequestPriority priority = ClientRequestPriority.Medium)
     {
-        return new ClientRequest(id, clientId, projectId, title, description, status, priority);
+        ClientRequest request = new(id, clientId, projectId, title, description, status, priority);
+        request.AddDomainEvent(new ClientRequestSubmittedEvent(request.Id, request.ClientId, request.ProjectId, DateTime.UtcNow));
+        return request;
     }
 
     public void UpdateTitle(string title)

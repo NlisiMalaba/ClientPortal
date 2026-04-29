@@ -2,7 +2,7 @@ using Shared;
 
 namespace Domain;
 
-public sealed class Milestone : Entity<Guid>
+public sealed class Milestone : AggregateRoot<Guid>
 {
     public Guid ProjectId { get; private set; }
 
@@ -61,7 +61,10 @@ public sealed class Milestone : Entity<Guid>
     public void MarkCompleted(DateTime? completedAtUtc = null)
     {
         Status = MilestoneStatus.Completed;
-        CompletedAt = NormalizeCompletedAt(completedAtUtc ?? DateTime.UtcNow);
+        DateTime completedAt = NormalizeCompletedAt(completedAtUtc ?? DateTime.UtcNow)
+            ?? throw new InvalidOperationException("CompletedAt cannot be null when marking milestone as completed.");
+        CompletedAt = completedAt;
+        AddDomainEvent(new MilestoneCompletedEvent(Id, ProjectId, completedAt));
         MarkUpdated();
     }
 

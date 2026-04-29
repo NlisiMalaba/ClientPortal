@@ -2,7 +2,7 @@ using Shared;
 
 namespace Domain;
 
-public sealed class ProjectTask : Entity<Guid>
+public sealed class ProjectTask : AggregateRoot<Guid>
 {
     public Guid ProjectId { get; private set; }
 
@@ -69,7 +69,13 @@ public sealed class ProjectTask : Entity<Guid>
 
     public void UpdateStatus(ProjectTaskStatus status)
     {
+        ProjectTaskStatus previousStatus = Status;
         Status = status;
+        if (previousStatus != status)
+        {
+            AddDomainEvent(new TaskStatusChangedEvent(Id, ProjectId, previousStatus, status, DateTime.UtcNow));
+        }
+
         MarkUpdated();
     }
 
