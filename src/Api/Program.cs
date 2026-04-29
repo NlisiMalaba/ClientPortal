@@ -76,6 +76,9 @@ builder.Services.AddAuthorization(options =>
     options.AddPolicy(AuthorizationPolicies.RequireStaff, policy => policy.RequireRole("Staff"));
     options.AddPolicy(AuthorizationPolicies.RequireAnyStaff, policy => policy.RequireRole("Owner", "Admin", "Staff"));
     options.AddPolicy(AuthorizationPolicies.RequireClientUser, policy => policy.RequireRole("ClientUser"));
+    options.AddPolicy(
+        AuthorizationPolicies.RequireTenantAccess,
+        policy => policy.Requirements.Add(new TenantAccessRequirement()));
 });
 builder.Services.AddRateLimiter(options =>
 {
@@ -144,6 +147,7 @@ builder.Services.AddScoped<ITenantDomainLookup, NullTenantDomainLookup>();
 builder.Services.AddScoped<ITenantResolver, SubdomainTenantResolver>();
 builder.Services.AddScoped<ITenantResolver, CustomDomainTenantResolver>();
 builder.Services.AddScoped<TenantMiddleware>();
+builder.Services.AddSingleton<IAuthorizationHandler, TenantAccessAuthorizationHandler>();
 
 var healthChecksBuilder = builder.Services.AddHealthChecks();
 string? postgresConnectionString = builder.Configuration.GetConnectionString("Postgres");
@@ -289,15 +293,6 @@ internal sealed class BearerSecuritySchemeTransformer(IAuthenticationSchemeProvi
 internal static class CorsPolicyNames
 {
     public const string Default = "DefaultCorsPolicy";
-}
-
-internal static class AuthorizationPolicies
-{
-    public const string RequireOwner = nameof(RequireOwner);
-    public const string RequireAdmin = nameof(RequireAdmin);
-    public const string RequireStaff = nameof(RequireStaff);
-    public const string RequireAnyStaff = nameof(RequireAnyStaff);
-    public const string RequireClientUser = nameof(RequireClientUser);
 }
 
 internal static class JwtKeyUtilities

@@ -17,12 +17,12 @@ public static class AuthEndpoints
         ArgumentNullException.ThrowIfNull(endpoints);
 
         RouteGroupBuilder group = endpoints.MapGroup("/api/v1/auth")
-            .WithTags("Auth")
-            .AllowAnonymous();
+            .WithTags("Auth");
 
         group.MapPost("/login", LoginAsync)
             .WithName("AuthLogin")
-            .RequireRateLimiting(RateLimitPolicies.AuthLogin);
+            .RequireRateLimiting(RateLimitPolicies.AuthLogin)
+            .AllowAnonymous();
 
         group.MapPost("/refresh", RefreshAsync)
             .WithName("AuthRefresh");
@@ -31,7 +31,8 @@ public static class AuthEndpoints
             .WithName("AuthLogout");
 
         group.MapPost("/register", RegisterAsync)
-            .WithName("AuthRegister");
+            .WithName("AuthRegister")
+            .AllowAnonymous();
 
         group.MapPost("/forgot-password", ForgotPasswordAsync)
             .WithName("AuthForgotPassword");
