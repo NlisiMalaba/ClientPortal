@@ -6,6 +6,7 @@ using Api.Clients;
 using Api.Contracts;
 using Api.HealthChecks;
 using Api.Middleware;
+using Api.Projects;
 using Api.Tenancy;
 using Infrastructure;
 using Infrastructure.Persistence;
@@ -221,6 +222,7 @@ app.UseAuthorization();
 app.MapHealthChecks("/health", new HealthCheckOptions());
 app.MapAuthEndpoints();
 app.MapClientsEndpoints();
+app.MapProjectsEndpoints();
 
 var summaries = new[]
 {
