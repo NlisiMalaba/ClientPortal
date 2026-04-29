@@ -1,6 +1,7 @@
 using System.Net;
 using Application.Auth;
 using Application.Auth.Dtos;
+using Application.Clients;
 using Api.Contracts;
 using MediatR;
 using Microsoft.AspNetCore.Http;
@@ -39,6 +40,10 @@ public static class AuthEndpoints
 
         group.MapPost("/reset-password", ResetPasswordAsync)
             .WithName("AuthResetPassword");
+
+        group.MapPost("/accept-invitation", AcceptInvitationAsync)
+            .WithName("AuthAcceptInvitation")
+            .AllowAnonymous();
 
         return endpoints;
     }
@@ -134,6 +139,17 @@ public static class AuthEndpoints
         return ToResponse(result);
     }
 
+    private static async Task<IResult> AcceptInvitationAsync(
+        AcceptInvitationRequest request,
+        ISender sender,
+        CancellationToken cancellationToken)
+    {
+        Result result = await sender.Send(
+            new AcceptInvitationCommand(request.Token, request.Password),
+            cancellationToken);
+        return ToResponse(result);
+    }
+
     private static IResult ToResponse(Result result)
     {
         if (result.IsSuccess)
@@ -219,6 +235,8 @@ public sealed record RegisterBusinessRequest(
 public sealed record ForgotPasswordRequest(string Email);
 
 public sealed record ResetPasswordRequest(string Token, string NewPassword);
+
+public sealed record AcceptInvitationRequest(string Token, string Password);
 
 public static class RateLimitPolicies
 {

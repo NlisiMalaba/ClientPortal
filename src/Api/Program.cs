@@ -2,6 +2,7 @@ using Application;
 using Application.Abstractions;
 using Application.Auth.Abstractions;
 using Api.Auth;
+using Api.Clients;
 using Api.Contracts;
 using Api.HealthChecks;
 using Api.Middleware;
@@ -219,6 +220,7 @@ app.UseAuthentication();
 app.UseAuthorization();
 app.MapHealthChecks("/health", new HealthCheckOptions());
 app.MapAuthEndpoints();
+app.MapClientsEndpoints();
 
 var summaries = new[]
 {
