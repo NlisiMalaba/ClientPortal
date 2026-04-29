@@ -4,6 +4,7 @@ using Application.Auth.Abstractions;
 using Api.Auth;
 using Api.Clients;
 using Api.Contracts;
+using Api.Documents;
 using Api.HealthChecks;
 using Api.Middleware;
 using Api.Projects;
@@ -223,6 +224,7 @@ app.MapHealthChecks("/health", new HealthCheckOptions());
 app.MapAuthEndpoints();
 app.MapClientsEndpoints();
 app.MapProjectsEndpoints();
+app.MapDocumentsEndpoints();
 
 var summaries = new[]
 {
