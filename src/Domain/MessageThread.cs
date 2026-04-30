@@ -91,6 +91,14 @@ public sealed class MessageThread : AggregateRoot<Guid>
         MarkUpdated();
     }
 
+    public void RaiseMessageSent(Guid messageId, Guid senderId, DateTime sentAt)
+    {
+        Guid normalizedMessageId = NormalizeRequiredId(messageId, nameof(messageId), "MessageId");
+        Guid normalizedSenderId = NormalizeRequiredId(senderId, nameof(senderId), "SenderId");
+        DateTime normalizedSentAt = NormalizeTimestamp(sentAt, nameof(sentAt), "SentAt");
+        AddDomainEvent(new MessageSentEvent(normalizedMessageId, Id, normalizedSenderId, normalizedSentAt));
+    }
+
     private void SetParticipants(IEnumerable<Guid> participants)
     {
         ArgumentNullException.ThrowIfNull(participants);

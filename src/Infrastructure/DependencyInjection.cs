@@ -1,6 +1,7 @@
 using System.Net.Http.Headers;
 using Application.Abstractions;
 using Application.Clients.Abstractions;
+using Application.Messaging.Abstractions;
 using Application.Auth.Abstractions;
 using Application.Invoices.Abstractions;
 using Infrastructure.Auth;
@@ -62,6 +63,9 @@ public static class DependencyInjection
         services.AddDbContext<PublicDbContext>();
         services.AddScoped<IDomainEventDispatcher, DomainEventDispatcher>();
         services.AddScoped<IClientRepository, ClientRepository>();
+        services.AddScoped<IMessageThreadRepository, MessageThreadRepository>();
+        services.AddScoped<IMessageRepository, MessageRepository>();
+        services.AddScoped<INoticeRepository, NoticeRepository>();
         services.AddScoped<IOnboardingChecklistRepository, OnboardingChecklistRepository>();
         services.AddSingleton<IJwtTokenService, JwtTokenService>();
         services.AddSingleton<IRefreshTokenService, Argon2RefreshTokenService>();
