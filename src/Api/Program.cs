@@ -6,6 +6,7 @@ using Api.Clients;
 using Api.Contracts;
 using Api.Documents;
 using Api.HealthChecks;
+using Api.Invoices;
 using Api.Middleware;
 using Api.Projects;
 using Api.Tenancy;
@@ -225,6 +226,8 @@ app.MapAuthEndpoints();
 app.MapClientsEndpoints();
 app.MapProjectsEndpoints();
 app.MapDocumentsEndpoints();
+app.MapInvoicesEndpoints();
+app.MapPaymentsWebhookEndpoints();
 
 var summaries = new[]
 {
