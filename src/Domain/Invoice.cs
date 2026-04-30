@@ -23,6 +23,8 @@ public sealed class Invoice : AggregateRoot<Guid>
 
     public decimal Total { get; private set; }
 
+    public decimal AmountPaid { get; private set; }
+
     public string Currency { get; private set; } = string.Empty;
 
     public DateOnly DueDate { get; private set; }
@@ -54,6 +56,7 @@ public sealed class Invoice : AggregateRoot<Guid>
         Status = status;
         Currency = NormalizeCurrency(currency);
         DueDate = dueDate;
+        AmountPaid = 0m;
         PaidAt = NormalizeOptionalUtc(paidAtUtc, nameof(paidAtUtc), allowFuture: false);
         Notes = NormalizeOptionalText(notes);
 
@@ -97,6 +100,20 @@ public sealed class Invoice : AggregateRoot<Guid>
         MarkUpdated();
     }
 
+    public void UpdateInvoiceNumber(string invoiceNumber)
+    {
+        EnsureEditable();
+        InvoiceNumber = NormalizeRequiredText(invoiceNumber, nameof(invoiceNumber));
+        MarkUpdated();
+    }
+
+    public void UpdateCurrency(string currency)
+    {
+        EnsureEditable();
+        Currency = NormalizeCurrency(currency);
+        MarkUpdated();
+    }
+
     public void SetDueDate(DateOnly dueDate)
     {
         EnsureEditable();
@@ -137,8 +154,40 @@ public sealed class Invoice : AggregateRoot<Guid>
         }
 
         Status = InvoiceStatus.Paid;
+        AmountPaid = Total;
         PaidAt = normalizedPaidAt;
         AddDomainEvent(new InvoicePaidEvent(Id, ClientId, normalizedPaidAt));
+        MarkUpdated();
+    }
+
+    public void RecordPayment(decimal amount, DateTime paidAtUtc)
+    {
+        decimal normalizedAmount = NormalizePaymentAmount(amount);
+        DateTime normalizedPaidAt = NormalizeOptionalUtc(paidAtUtc, nameof(paidAtUtc), allowFuture: false)!.Value;
+        if (Status == InvoiceStatus.Cancelled)
+        {
+            throw new InvalidOperationException("Cancelled invoices cannot receive payments.");
+        }
+
+        decimal remainingBeforePayment = decimal.Round(Total - AmountPaid, 2, MidpointRounding.ToEven);
+        if (normalizedAmount > remainingBeforePayment)
+        {
+            throw new InvalidOperationException("Payment amount exceeds outstanding invoice balance.");
+        }
+
+        AmountPaid = decimal.Round(AmountPaid + normalizedAmount, 2, MidpointRounding.ToEven);
+        if (AmountPaid >= Total)
+        {
+            Status = InvoiceStatus.Paid;
+            PaidAt = normalizedPaidAt;
+            AddDomainEvent(new InvoicePaidEvent(Id, ClientId, normalizedPaidAt));
+        }
+        else
+        {
+            Status = InvoiceStatus.PartiallyPaid;
+            PaidAt = null;
+        }
+
         MarkUpdated();
     }
 
@@ -256,6 +305,16 @@ public sealed class Invoice : AggregateRoot<Guid>
         }
 
         return normalized;
+    }
+
+    private static decimal NormalizePaymentAmount(decimal amount)
+    {
+        if (amount <= 0m)
+        {
+            throw new ArgumentOutOfRangeException(nameof(amount), "Payment amount must be greater than zero.");
+        }
+
+        return decimal.Round(amount, 2, MidpointRounding.ToEven);
     }
 }
 

@@ -106,6 +106,55 @@ public sealed class InvoiceTests
 
         Assert.Equal(InvoiceStatus.Paid, invoice.Status);
         Assert.Equal(paidAt, invoice.PaidAt);
+        Assert.Equal(invoice.Total, invoice.AmountPaid);
+        InvoicePaidEvent @event = Assert.IsType<InvoicePaidEvent>(Assert.Single(invoice.DomainEvents));
+        Assert.Equal(invoice.Id, @event.InvoiceId);
+        Assert.Equal(invoice.ClientId, @event.ClientId);
+        Assert.Equal(paidAt, @event.PaidAt);
+    }
+
+    [Fact]
+    public void RecordPayment_WithPartialAmount_SetsPartiallyPaidStatus()
+    {
+        Invoice invoice = Invoice.Create(
+            Guid.NewGuid(),
+            Guid.NewGuid(),
+            Guid.NewGuid(),
+            "INV-0004",
+            [new LineItem("Maintenance", 1m, 1000m, 0.15m)],
+            "ZMW",
+            new DateOnly(2026, 05, 20));
+
+        DateTime paidAt = DateTime.UtcNow.AddMinutes(-1);
+        invoice.RecordPayment(500m, paidAt);
+
+        Assert.Equal(InvoiceStatus.PartiallyPaid, invoice.Status);
+        Assert.Equal(500m, invoice.AmountPaid);
+        Assert.Null(invoice.PaidAt);
+        Assert.Empty(invoice.DomainEvents);
+    }
+
+    [Fact]
+    public void RecordPayment_WithOutstandingBalanceCompletion_SetsPaidAndRaisesEvent()
+    {
+        Invoice invoice = Invoice.Create(
+            Guid.NewGuid(),
+            Guid.NewGuid(),
+            Guid.NewGuid(),
+            "INV-0005",
+            [new LineItem("Maintenance", 1m, 1000m, 0.15m)],
+            "ZMW",
+            new DateOnly(2026, 05, 20));
+
+        invoice.RecordPayment(500m, DateTime.UtcNow.AddMinutes(-2));
+        invoice.ClearDomainEvents();
+
+        DateTime paidAt = DateTime.UtcNow.AddMinutes(-1);
+        invoice.RecordPayment(650m, paidAt);
+
+        Assert.Equal(InvoiceStatus.Paid, invoice.Status);
+        Assert.Equal(1150m, invoice.AmountPaid);
+        Assert.Equal(paidAt, invoice.PaidAt);
         InvoicePaidEvent @event = Assert.IsType<InvoicePaidEvent>(Assert.Single(invoice.DomainEvents));
         Assert.Equal(invoice.Id, @event.InvoiceId);
         Assert.Equal(invoice.ClientId, @event.ClientId);

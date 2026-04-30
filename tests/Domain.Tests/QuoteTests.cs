@@ -65,4 +65,25 @@ public sealed class QuoteTests
         Assert.Equal(quote.ClientId, @event.ClientId);
         Assert.Equal(QuoteStatus.Accepted, quote.Status);
     }
+
+    [Fact]
+    public void MarkConvertedToInvoice_WhenAccepted_SetsConvertedInvoiceId()
+    {
+        Quote quote = Quote.Create(
+            Guid.NewGuid(),
+            Guid.NewGuid(),
+            Guid.NewGuid(),
+            "Q-0004",
+            [new LineItem("Consulting", 1m, 500m, 0m)],
+            "ZAR",
+            new DateOnly(2026, 06, 01));
+
+        quote.MarkSent();
+        quote.MarkAccepted();
+
+        Guid invoiceId = Guid.NewGuid();
+        quote.MarkConvertedToInvoice(invoiceId);
+
+        Assert.Equal(invoiceId, quote.ConvertedInvoiceId);
+    }
 }

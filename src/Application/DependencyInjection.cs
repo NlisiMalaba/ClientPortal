@@ -1,4 +1,6 @@
 using Application.Behaviours;
+using Application.Invoices;
+using Application.Invoices.Abstractions;
 using FluentValidation;
 using MediatR;
 using Microsoft.Extensions.DependencyInjection;
@@ -10,6 +12,7 @@ public static class DependencyInjection
     public static IServiceCollection AddApplication(this IServiceCollection services)
     {
         services.AddValidatorsFromAssembly(typeof(DependencyInjection).Assembly);
+        services.AddScoped<ITaxCalculator, TenantTaxCalculator>();
 
         services.AddMediatR(configuration =>
         {

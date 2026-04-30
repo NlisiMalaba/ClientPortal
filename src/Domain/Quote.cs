@@ -29,6 +29,8 @@ public sealed class Quote : AggregateRoot<Guid>
 
     public string? Notes { get; private set; }
 
+    public Guid? ConvertedInvoiceId { get; private set; }
+
     private Quote()
     {
     }
@@ -52,6 +54,7 @@ public sealed class Quote : AggregateRoot<Guid>
         Currency = NormalizeCurrency(currency);
         DueDate = dueDate;
         Notes = NormalizeOptionalText(notes);
+        ConvertedInvoiceId = null;
 
         ReplaceLineItemsInternal(lineItems);
     }
@@ -109,6 +112,27 @@ public sealed class Quote : AggregateRoot<Guid>
 
         Status = QuoteStatus.Accepted;
         AddDomainEvent(new QuoteAcceptedEvent(Id, ClientId, DateTime.UtcNow));
+        MarkUpdated();
+    }
+
+    public void MarkConvertedToInvoice(Guid invoiceId)
+    {
+        if (Status != QuoteStatus.Accepted)
+        {
+            throw new InvalidOperationException("Only accepted quotes can be converted to invoices.");
+        }
+
+        if (ConvertedInvoiceId.HasValue)
+        {
+            throw new InvalidOperationException("Quote has already been converted to an invoice.");
+        }
+
+        if (invoiceId == Guid.Empty)
+        {
+            throw new ArgumentException("Invoice identifier cannot be empty.", nameof(invoiceId));
+        }
+
+        ConvertedInvoiceId = invoiceId;
         MarkUpdated();
     }
 

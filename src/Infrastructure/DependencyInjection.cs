@@ -1,7 +1,9 @@
 using Application.Abstractions;
 using Application.Clients.Abstractions;
 using Application.Auth.Abstractions;
+using Application.Invoices.Abstractions;
 using Infrastructure.Auth;
+using Infrastructure.Invoices;
 using Infrastructure.Persistence;
 using Infrastructure.Persistence.Public;
 using Infrastructure.Persistence.Security;
@@ -46,6 +48,7 @@ public static class DependencyInjection
         services.AddScoped<ITenantProvisioner, TenantProvisioner>();
         services.AddScoped<IDbInitializer, DbInitializer>();
         services.AddScoped<ITenantRlsPolicyManager, TenantRlsPolicyManager>();
+        services.AddScoped<IInvoicePdfGenerator, SimpleInvoicePdfGenerator>();
 
         return services;
     }
