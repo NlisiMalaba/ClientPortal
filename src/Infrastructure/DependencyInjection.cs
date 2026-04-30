@@ -1,3 +1,4 @@
+using System.Net.Http.Headers;
 using Application.Abstractions;
 using Application.Clients.Abstractions;
 using Application.Auth.Abstractions;
@@ -36,6 +37,27 @@ public static class DependencyInjection
             options.DegreeOfParallelism = int.TryParse(section["DegreeOfParallelism"], out int degreeOfParallelism) ? degreeOfParallelism : 2;
             options.Pepper = section["Pepper"] ?? string.Empty;
         });
+        services.Configure<PeachPaymentsOptions>(options =>
+        {
+            IConfigurationSection section = configuration.GetSection(PeachPaymentsOptions.SectionName);
+            options.BaseUrl = section["BaseUrl"] ?? options.BaseUrl;
+            options.EntityId = section["EntityId"] ?? string.Empty;
+            options.AccessToken = section["AccessToken"] ?? string.Empty;
+            options.Currency = section["Currency"] ?? options.Currency;
+            options.RequestTimeoutSeconds = int.TryParse(section["RequestTimeoutSeconds"], out int timeoutSeconds)
+                ? timeoutSeconds
+                : options.RequestTimeoutSeconds;
+        });
+        services.Configure<StripeOptions>(options =>
+        {
+            IConfigurationSection section = configuration.GetSection(StripeOptions.SectionName);
+            options.BaseUrl = section["BaseUrl"] ?? options.BaseUrl;
+            options.SecretKey = section["SecretKey"] ?? string.Empty;
+            options.Currency = section["Currency"] ?? options.Currency;
+            options.RequestTimeoutSeconds = int.TryParse(section["RequestTimeoutSeconds"], out int timeoutSeconds)
+                ? timeoutSeconds
+                : options.RequestTimeoutSeconds;
+        });
         services.AddDbContext<TenantDbContext>();
         services.AddDbContext<PublicDbContext>();
         services.AddScoped<IDomainEventDispatcher, DomainEventDispatcher>();
@@ -49,6 +71,38 @@ public static class DependencyInjection
         services.AddScoped<IDbInitializer, DbInitializer>();
         services.AddScoped<ITenantRlsPolicyManager, TenantRlsPolicyManager>();
         services.AddScoped<IInvoicePdfGenerator, SimpleInvoicePdfGenerator>();
+        services.AddSingleton<ICurrencyConverter, CachedCurrencyConverter>();
+        services.AddHttpClient<PeachPaymentsGateway>((serviceProvider, client) =>
+        {
+            PeachPaymentsOptions options = serviceProvider
+                .GetRequiredService<Microsoft.Extensions.Options.IOptions<PeachPaymentsOptions>>()
+                .Value;
+
+            client.BaseAddress = new Uri(options.BaseUrl, UriKind.Absolute);
+            client.Timeout = TimeSpan.FromSeconds(Math.Max(5, options.RequestTimeoutSeconds));
+
+            if (!string.IsNullOrWhiteSpace(options.AccessToken))
+            {
+                client.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", options.AccessToken);
+            }
+        });
+        services.AddHttpClient<StripeGateway>((serviceProvider, client) =>
+        {
+            StripeOptions options = serviceProvider
+                .GetRequiredService<Microsoft.Extensions.Options.IOptions<StripeOptions>>()
+                .Value;
+
+            client.BaseAddress = new Uri(options.BaseUrl, UriKind.Absolute);
+            client.Timeout = TimeSpan.FromSeconds(Math.Max(5, options.RequestTimeoutSeconds));
+
+            if (!string.IsNullOrWhiteSpace(options.SecretKey))
+            {
+                client.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", options.SecretKey);
+            }
+        });
+        services.AddScoped<ManualPaymentGateway>();
+        services.AddScoped<NoopPaymentGateway>();
+        services.AddScoped<IPaymentGateway, RoutedPaymentGateway>();
 
         return services;
     }
