@@ -1,15 +1,25 @@
 using Application;
 using Application.Abstractions;
 using Application.Auth.Abstractions;
+using Application.Documents;
+using Application.Invoices;
+using Application.Meetings;
+using Application.Messaging.Abstractions;
+using Application.Notifications;
+using Api.BackgroundJobs;
 using Api.Auth;
 using Api.Clients;
+using Api.Communication;
 using Api.Contracts;
 using Api.Documents;
 using Api.HealthChecks;
 using Api.Invoices;
 using Api.Middleware;
+using Api.Notifications;
 using Api.Projects;
 using Api.Tenancy;
+using Hangfire;
+using Hangfire.PostgreSql;
 using Infrastructure;
 using Infrastructure.Persistence;
 using Microsoft.AspNetCore.Authentication;
@@ -18,6 +28,7 @@ using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Diagnostics.HealthChecks;
 using Microsoft.AspNetCore.OpenApi;
 using Microsoft.AspNetCore.RateLimiting;
+using Microsoft.AspNetCore.SignalR;
 using Microsoft.Extensions.Diagnostics.HealthChecks;
 using Microsoft.IdentityModel.Tokens;
 using Microsoft.OpenApi;
@@ -136,6 +147,24 @@ builder.Services.AddCors(options =>
 });
 builder.Services.AddProblemDetails();
 builder.Services.AddExceptionHandler<GlobalExceptionHandler>();
+builder.Services.AddSignalR();
+builder.Services.AddHangfire((serviceProvider, configuration) =>
+{
+    IConfiguration appConfiguration = serviceProvider.GetRequiredService<IConfiguration>();
+    string connectionString = appConfiguration.GetConnectionString("Postgres")
+        ?? throw new InvalidOperationException("ConnectionStrings:Postgres must be configured for Hangfire.");
+
+    configuration
+        .UseSimpleAssemblyNameTypeSerializer()
+        .UseRecommendedSerializerSettings()
+        .UsePostgreSqlStorage(
+            options => options.UseNpgsqlConnection(connectionString),
+            new PostgreSqlStorageOptions
+            {
+                SchemaName = "public"
+            });
+});
+builder.Services.AddHangfireServer();
 builder.Services.Configure<RefreshTokenCookieOptions>(options =>
 {
     IConfigurationSection section = builder.Configuration.GetSection(RefreshTokenCookieOptions.SectionName);
@@ -147,6 +176,10 @@ builder.Services.AddInfrastructure(builder.Configuration);
 builder.Services.AddHttpContextAccessor();
 builder.Services.AddScoped<IRefreshTokenCookieStore, HttpContextRefreshTokenCookieStore>();
 builder.Services.AddScoped<ICurrentTenant, HttpCurrentTenant>();
+builder.Services.AddScoped<IRealtimeMessagingService, SignalRRealtimeMessagingService>();
+builder.Services.AddSingleton<IConnectionPresenceTracker, ConnectionPresenceTracker>();
+builder.Services.AddSingleton<IUserPresenceService, ConnectionPresenceService>();
+builder.Services.AddSingleton<IHubFilter, MessagesHubGuardFilter>();
 builder.Services.AddScoped<ITenantDomainLookup, NullTenantDomainLookup>();
 builder.Services.AddScoped<ITenantResolver, SubdomainTenantResolver>();
 builder.Services.AddScoped<ITenantResolver, CustomDomainTenantResolver>();
@@ -221,6 +254,12 @@ app.UseMiddleware<TenantMiddleware>();
 app.UseRateLimiter();
 app.UseAuthentication();
 app.UseAuthorization();
+app.UseHangfireDashboard(
+    "/hangfire",
+    new DashboardOptions
+    {
+        Authorization = [new OwnerDashboardAuthorizationFilter()]
+    });
 app.MapHealthChecks("/health", new HealthCheckOptions());
 app.MapAuthEndpoints();
 app.MapClientsEndpoints();
@@ -228,6 +267,59 @@ app.MapProjectsEndpoints();
 app.MapDocumentsEndpoints();
 app.MapInvoicesEndpoints();
 app.MapPaymentsWebhookEndpoints();
+app.MapCommunicationEndpoints();
+app.MapNotificationsEndpoints();
+app.MapHub<MessagesHub>("/hubs/messages")
+    .RequireTenant()
+    .RequireAuthorization();
+RecurringJob.AddOrUpdate<InvoiceReminderJob>(
+    "invoice-reminder-job",
+    job => job.RunAsync(CancellationToken.None),
+    "0 8 * * *",
+    new RecurringJobOptions
+    {
+        TimeZone = TimeZoneInfo.Local
+    });
+RecurringJob.AddOrUpdate<RecurringInvoiceJob>(
+    "recurring-invoice-job",
+    job => job.RunAsync(CancellationToken.None),
+    "15 0 * * *",
+    new RecurringJobOptions
+    {
+        TimeZone = TimeZoneInfo.Local
+    });
+RecurringJob.AddOrUpdate<MeetingReminderJob>(
+    "meeting-reminder-job",
+    job => job.RunAsync(CancellationToken.None),
+    "0 * * * *",
+    new RecurringJobOptions
+    {
+        TimeZone = TimeZoneInfo.Local
+    });
+RecurringJob.AddOrUpdate<DocumentExpiryJob>(
+    "document-expiry-job",
+    job => job.RunAsync(CancellationToken.None),
+    "0 6 * * *",
+    new RecurringJobOptions
+    {
+        TimeZone = TimeZoneInfo.Local
+    });
+RecurringJob.AddOrUpdate<WeeklyDigestJob>(
+    "weekly-digest-job",
+    job => job.RunAsync(CancellationToken.None),
+    "0 7 * * 1",
+    new RecurringJobOptions
+    {
+        TimeZone = TimeZoneInfo.Local
+    });
+RecurringJob.AddOrUpdate<CurrencyRateRefreshJob>(
+    "currency-rate-refresh-job",
+    job => job.RunAsync(CancellationToken.None),
+    "0 */6 * * *",
+    new RecurringJobOptions
+    {
+        TimeZone = TimeZoneInfo.Local
+    });
 
 var summaries = new[]
 {

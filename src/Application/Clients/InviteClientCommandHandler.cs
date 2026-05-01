@@ -4,7 +4,6 @@ using Application.Clients.Abstractions;
 using Application.Clients.Dtos;
 using Domain;
 using MediatR;
-using Microsoft.Extensions.Logging;
 using Shared;
 
 namespace Application.Clients;
@@ -16,38 +15,27 @@ public sealed class InviteClientCommandHandler : IRequestHandler<InviteClientCom
         "A client or user with this email already exists.",
         ErrorType.Conflict);
 
-    private static readonly Error InviteEmailFailedError = new(
-        "Clients.InviteEmailFailed",
-        "Failed to send the client invite email.",
-        ErrorType.Unexpected);
-
     private readonly IClientRepository _clientRepository;
     private readonly IClientUserAccountRepository _clientUserAccountRepository;
     private readonly IClientInvitationTokenService _clientInvitationTokenService;
     private readonly IClientInvitationTokenStore _clientInvitationTokenStore;
-    private readonly IClientInviteNotificationService _clientInviteNotificationService;
     private readonly IPasswordHasher _passwordHasher;
     private readonly IUnitOfWork _unitOfWork;
-    private readonly ILogger<InviteClientCommandHandler> _logger;
 
     public InviteClientCommandHandler(
         IClientRepository clientRepository,
         IClientUserAccountRepository clientUserAccountRepository,
         IClientInvitationTokenService clientInvitationTokenService,
         IClientInvitationTokenStore clientInvitationTokenStore,
-        IClientInviteNotificationService clientInviteNotificationService,
         IPasswordHasher passwordHasher,
-        IUnitOfWork unitOfWork,
-        ILogger<InviteClientCommandHandler> logger)
+        IUnitOfWork unitOfWork)
     {
         _clientRepository = clientRepository;
         _clientUserAccountRepository = clientUserAccountRepository;
         _clientInvitationTokenService = clientInvitationTokenService;
         _clientInvitationTokenStore = clientInvitationTokenStore;
-        _clientInviteNotificationService = clientInviteNotificationService;
         _passwordHasher = passwordHasher;
         _unitOfWork = unitOfWork;
-        _logger = logger;
     }
 
     public async Task<Result<InviteClientResultDto>> Handle(InviteClientCommand request, CancellationToken cancellationToken)
@@ -97,6 +85,12 @@ public sealed class InviteClientCommandHandler : IRequestHandler<InviteClientCom
                 inviteToken.TokenHash,
                 inviteToken.ExpiresAtUtc,
                 cancellationToken);
+            client.RaiseInvitedEvent(
+                clientUser.Id,
+                client.Email.Value,
+                client.ContactName,
+                inviteToken.Token,
+                client.InvitedAt);
 
             await _unitOfWork.SaveChangesAsync(cancellationToken);
             await _unitOfWork.CommitAsync(cancellationToken);
@@ -105,25 +99,6 @@ public sealed class InviteClientCommandHandler : IRequestHandler<InviteClientCom
         {
             await _unitOfWork.RollbackAsync(cancellationToken);
             throw;
-        }
-
-        try
-        {
-            await _clientInviteNotificationService.SendInviteAsync(
-                client,
-                clientUser,
-                inviteToken.Token,
-                client.InvitedAt,
-                cancellationToken);
-        }
-        catch (Exception ex)
-        {
-            _logger.LogError(
-                ex,
-                "Failed to send invite email for client {ClientId} and user {ClientUserId}.",
-                client.Id,
-                clientUser.Id);
-            return Result<InviteClientResultDto>.Failure(InviteEmailFailedError);
         }
 
         InviteClientResultDto result = new(client.Id, clientUser.Id);

@@ -25,35 +25,19 @@ public sealed class SendInvoiceCommandHandler : IRequestHandler<SendInvoiceComma
         "Invoice cannot be sent in its current state.",
         ErrorType.Conflict);
 
-    private static readonly Error InvoicePdfGenerationFailedError = new(
-        "Invoices.PdfGenerationFailed",
-        "Invoice was sent but PDF generation failed.",
-        ErrorType.Unexpected);
-
-    private static readonly Error InvoiceNotificationFailedError = new(
-        "Invoices.NotificationFailed",
-        "Invoice was sent but notifying the client failed.",
-        ErrorType.Unexpected);
-
     private readonly IInvoiceRepository _invoiceRepository;
     private readonly IClientRepository _clientRepository;
-    private readonly IInvoicePdfGenerator _invoicePdfGenerator;
-    private readonly IInvoiceNotificationService _invoiceNotificationService;
     private readonly IUnitOfWork _unitOfWork;
     private readonly ILogger<SendInvoiceCommandHandler> _logger;
 
     public SendInvoiceCommandHandler(
         IInvoiceRepository invoiceRepository,
         IClientRepository clientRepository,
-        IInvoicePdfGenerator invoicePdfGenerator,
-        IInvoiceNotificationService invoiceNotificationService,
         IUnitOfWork unitOfWork,
         ILogger<SendInvoiceCommandHandler> logger)
     {
         _invoiceRepository = invoiceRepository;
         _clientRepository = clientRepository;
-        _invoicePdfGenerator = invoicePdfGenerator;
-        _invoiceNotificationService = invoiceNotificationService;
         _unitOfWork = unitOfWork;
         _logger = logger;
     }
@@ -84,31 +68,6 @@ public sealed class SendInvoiceCommandHandler : IRequestHandler<SendInvoiceComma
 
         _invoiceRepository.Update(invoice);
         await _unitOfWork.SaveChangesAsync(cancellationToken);
-
-        InvoicePdfDocument invoicePdf;
-        try
-        {
-            invoicePdf = await _invoicePdfGenerator.GenerateAsync(invoice, cancellationToken);
-        }
-        catch (Exception ex)
-        {
-            _logger.LogError(ex, "Failed to generate PDF for invoice {InvoiceId}.", invoice.Id);
-            return Result.Failure(InvoicePdfGenerationFailedError);
-        }
-
-        try
-        {
-            await _invoiceNotificationService.NotifyInvoiceSentAsync(
-                client,
-                invoice,
-                invoicePdf,
-                cancellationToken);
-        }
-        catch (Exception ex)
-        {
-            _logger.LogError(ex, "Failed to send invoice notification for invoice {InvoiceId}.", invoice.Id);
-            return Result.Failure(InvoiceNotificationFailedError);
-        }
 
         return Result.Success();
     }

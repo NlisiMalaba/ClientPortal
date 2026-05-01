@@ -1,10 +1,19 @@
 using System.Net.Http.Headers;
 using Application.Abstractions;
 using Application.Clients.Abstractions;
+using Application.Documents.Abstractions;
+using Application.Messaging.Abstractions;
+using Application.Meetings.Abstractions;
 using Application.Auth.Abstractions;
 using Application.Invoices.Abstractions;
+using Application.Notifications.Abstractions;
 using Infrastructure.Auth;
+using Infrastructure.Clients;
+using Infrastructure.Documents;
 using Infrastructure.Invoices;
+using Infrastructure.Messaging;
+using Infrastructure.Meetings;
+using Infrastructure.Notifications;
 using Infrastructure.Persistence;
 using Infrastructure.Persistence.Public;
 using Infrastructure.Persistence.Security;
@@ -58,10 +67,44 @@ public static class DependencyInjection
                 ? timeoutSeconds
                 : options.RequestTimeoutSeconds;
         });
+        services.Configure<EmailNotificationOptions>(configuration.GetSection(EmailNotificationOptions.SectionName));
+        services.Configure<TwilioWhatsAppOptions>(configuration.GetSection(TwilioWhatsAppOptions.SectionName));
+        services.Configure<ClientInvitationLinkFactoryOptions>(configuration.GetSection(ClientInvitationLinkFactoryOptions.SectionName));
+        services.Configure<InvoicePaymentNotificationOptions>(configuration.GetSection(InvoicePaymentNotificationOptions.SectionName));
+        services.Configure<ContractNotificationOptions>(configuration.GetSection(ContractNotificationOptions.SectionName));
+        services.Configure<MessageAttachmentUploadOptions>(configuration.GetSection(MessageAttachmentUploadOptions.SectionName));
         services.AddDbContext<TenantDbContext>();
         services.AddDbContext<PublicDbContext>();
         services.AddScoped<IDomainEventDispatcher, DomainEventDispatcher>();
         services.AddScoped<IClientRepository, ClientRepository>();
+        services.AddSingleton<IClientInvitationLinkFactory, ClientInvitationLinkFactory>();
+        services.AddScoped<IMessageThreadRepository, MessageThreadRepository>();
+        services.AddScoped<IMessageRepository, MessageRepository>();
+        services.AddSingleton<IInvoiceBusinessStaffRecipientProvider, InvoiceBusinessStaffRecipientProvider>();
+        services.AddSingleton<IContractBusinessStaffRecipientProvider, ContractBusinessStaffRecipientProvider>();
+        services.AddScoped<IExpiringContractAlertReader, NpgsqlExpiringContractAlertReader>();
+        services.AddSingleton<IMessageAttachmentUploadUrlService, MessageAttachmentUploadUrlService>();
+        services.AddSingleton<IMessageAttachmentMalwareScanService, MessageAttachmentMalwareScanHookService>();
+        services.AddScoped<IMessageOfflineFallbackNotifier, NoopMessageOfflineFallbackNotifier>();
+        services.AddScoped<IInAppNotificationRepository, InAppNotificationRepository>();
+        services.AddScoped<INotificationPreferencesRepository, NotificationPreferencesRepository>();
+        services.AddScoped<INotificationService, RoutedNotificationService>();
+        services.AddScoped<IWeeklyDigestReader, NpgsqlWeeklyDigestReader>();
+        services.AddSingleton<INotificationTemplateEngine, NotificationTemplateEngine>();
+        services.AddScoped<INotificationChannelHandler, EmailNotificationService>();
+        services.AddScoped<INotificationChannelHandler, InAppNotificationService>();
+        services.AddHttpClient<INotificationChannelHandler, WhatsAppNotificationService>((serviceProvider, client) =>
+        {
+            TwilioWhatsAppOptions options = serviceProvider
+                .GetRequiredService<Microsoft.Extensions.Options.IOptions<TwilioWhatsAppOptions>>()
+                .Value;
+            client.BaseAddress = new Uri(options.BaseUrl, UriKind.Absolute);
+            client.Timeout = TimeSpan.FromSeconds(30);
+        });
+        services.AddScoped<INoticeRepository, NoticeRepository>();
+        services.AddScoped<IMeetingRepository, MeetingRepository>();
+        services.AddScoped<IMeetingInvitationService, EmailMeetingInvitationService>();
+        services.AddScoped<IMeetingReminderReader, NpgsqlMeetingReminderReader>();
         services.AddScoped<IOnboardingChecklistRepository, OnboardingChecklistRepository>();
         services.AddSingleton<IJwtTokenService, JwtTokenService>();
         services.AddSingleton<IRefreshTokenService, Argon2RefreshTokenService>();
@@ -71,7 +114,11 @@ public static class DependencyInjection
         services.AddScoped<IDbInitializer, DbInitializer>();
         services.AddScoped<ITenantRlsPolicyManager, TenantRlsPolicyManager>();
         services.AddScoped<IInvoicePdfGenerator, SimpleInvoicePdfGenerator>();
-        services.AddSingleton<ICurrencyConverter, CachedCurrencyConverter>();
+        services.AddScoped<IOverdueInvoiceReminderReader, NpgsqlOverdueInvoiceReminderReader>();
+        services.AddScoped<IRecurringInvoiceGenerator, NpgsqlRecurringInvoiceGenerator>();
+        services.AddSingleton<CachedCurrencyConverter>();
+        services.AddSingleton<ICurrencyConverter>(serviceProvider => serviceProvider.GetRequiredService<CachedCurrencyConverter>());
+        services.AddSingleton<ICurrencyRatesCacheRefresher>(serviceProvider => serviceProvider.GetRequiredService<CachedCurrencyConverter>());
         services.AddHttpClient<PeachPaymentsGateway>((serviceProvider, client) =>
         {
             PeachPaymentsOptions options = serviceProvider
