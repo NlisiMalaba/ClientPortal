@@ -4,7 +4,7 @@ using Microsoft.Extensions.Configuration;
 
 namespace Infrastructure.Invoices;
 
-public sealed class CachedCurrencyConverter : ICurrencyConverter
+public sealed class CachedCurrencyConverter : ICurrencyConverter, ICurrencyRatesCacheRefresher
 {
     private static readonly IReadOnlyDictionary<string, decimal> DefaultUsdRates = new Dictionary<string, decimal>(StringComparer.Ordinal)
     {
@@ -71,6 +71,19 @@ public sealed class CachedCurrencyConverter : ICurrencyConverter
             RateAsOfUtc: DateTime.UtcNow);
 
         return Task.FromResult(result);
+    }
+
+    public Task RefreshAsync(CancellationToken cancellationToken)
+    {
+        cancellationToken.ThrowIfCancellationRequested();
+
+        lock (_sync)
+        {
+            _cachedUsdRates = LoadRatesFromConfiguration();
+            _cacheExpiresAtUtc = DateTime.UtcNow.Add(_cacheDuration);
+        }
+
+        return Task.CompletedTask;
     }
 
     private IReadOnlyDictionary<string, decimal> GetRates()

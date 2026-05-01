@@ -20,4 +20,13 @@ public sealed class ContractBusinessStaffRecipientProvider : IContractBusinessSt
             .Distinct(StringComparer.OrdinalIgnoreCase)
             .ToArray();
     }
+
+    public IReadOnlyList<string> GetExpiringContractNotificationRecipients()
+    {
+        return (_options.ExpiringBusinessStaffEmailRecipients ?? [])
+            .Where(static value => !string.IsNullOrWhiteSpace(value))
+            .Select(static value => value.Trim())
+            .Distinct(StringComparer.OrdinalIgnoreCase)
+            .ToArray();
+    }
 }

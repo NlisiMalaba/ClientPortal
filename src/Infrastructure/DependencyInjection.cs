@@ -82,12 +82,14 @@ public static class DependencyInjection
         services.AddScoped<IMessageRepository, MessageRepository>();
         services.AddSingleton<IInvoiceBusinessStaffRecipientProvider, InvoiceBusinessStaffRecipientProvider>();
         services.AddSingleton<IContractBusinessStaffRecipientProvider, ContractBusinessStaffRecipientProvider>();
+        services.AddScoped<IExpiringContractAlertReader, NpgsqlExpiringContractAlertReader>();
         services.AddSingleton<IMessageAttachmentUploadUrlService, MessageAttachmentUploadUrlService>();
         services.AddSingleton<IMessageAttachmentMalwareScanService, MessageAttachmentMalwareScanHookService>();
         services.AddScoped<IMessageOfflineFallbackNotifier, NoopMessageOfflineFallbackNotifier>();
         services.AddScoped<IInAppNotificationRepository, InAppNotificationRepository>();
         services.AddScoped<INotificationPreferencesRepository, NotificationPreferencesRepository>();
         services.AddScoped<INotificationService, RoutedNotificationService>();
+        services.AddScoped<IWeeklyDigestReader, NpgsqlWeeklyDigestReader>();
         services.AddSingleton<INotificationTemplateEngine, NotificationTemplateEngine>();
         services.AddScoped<INotificationChannelHandler, EmailNotificationService>();
         services.AddScoped<INotificationChannelHandler, InAppNotificationService>();
@@ -102,6 +104,7 @@ public static class DependencyInjection
         services.AddScoped<INoticeRepository, NoticeRepository>();
         services.AddScoped<IMeetingRepository, MeetingRepository>();
         services.AddScoped<IMeetingInvitationService, EmailMeetingInvitationService>();
+        services.AddScoped<IMeetingReminderReader, NpgsqlMeetingReminderReader>();
         services.AddScoped<IOnboardingChecklistRepository, OnboardingChecklistRepository>();
         services.AddSingleton<IJwtTokenService, JwtTokenService>();
         services.AddSingleton<IRefreshTokenService, Argon2RefreshTokenService>();
@@ -111,7 +114,11 @@ public static class DependencyInjection
         services.AddScoped<IDbInitializer, DbInitializer>();
         services.AddScoped<ITenantRlsPolicyManager, TenantRlsPolicyManager>();
         services.AddScoped<IInvoicePdfGenerator, SimpleInvoicePdfGenerator>();
-        services.AddSingleton<ICurrencyConverter, CachedCurrencyConverter>();
+        services.AddScoped<IOverdueInvoiceReminderReader, NpgsqlOverdueInvoiceReminderReader>();
+        services.AddScoped<IRecurringInvoiceGenerator, NpgsqlRecurringInvoiceGenerator>();
+        services.AddSingleton<CachedCurrencyConverter>();
+        services.AddSingleton<ICurrencyConverter>(serviceProvider => serviceProvider.GetRequiredService<CachedCurrencyConverter>());
+        services.AddSingleton<ICurrencyRatesCacheRefresher>(serviceProvider => serviceProvider.GetRequiredService<CachedCurrencyConverter>());
         services.AddHttpClient<PeachPaymentsGateway>((serviceProvider, client) =>
         {
             PeachPaymentsOptions options = serviceProvider
