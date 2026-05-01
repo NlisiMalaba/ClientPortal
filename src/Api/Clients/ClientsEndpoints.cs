@@ -7,6 +7,7 @@ using Api.Tenancy;
 using Domain;
 using MediatR;
 using Microsoft.AspNetCore.Http;
+using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.Routing;
 using System.Security.Claims;
 using Shared;
@@ -133,9 +134,9 @@ public static class ClientsEndpoints
 
     private static async Task<IResult> GetOnboardingStatusAsync(
         ClaimsPrincipal principal,
-        IUserAuthenticationRepository userAuthenticationRepository,
-        Application.Clients.Abstractions.IClientRepository clientRepository,
-        ISender sender,
+        [FromServices] IUserAuthenticationRepository userAuthenticationRepository,
+        [FromServices] Application.Clients.Abstractions.IClientRepository clientRepository,
+        [FromServices] ISender sender,
         CancellationToken cancellationToken)
     {
         Result<Guid> clientIdResult = await ResolveCurrentClientIdAsync(
@@ -157,9 +158,9 @@ public static class ClientsEndpoints
     private static async Task<IResult> CompleteOnboardingStepAsync(
         string stepKey,
         ClaimsPrincipal principal,
-        IUserAuthenticationRepository userAuthenticationRepository,
-        Application.Clients.Abstractions.IClientRepository clientRepository,
-        ISender sender,
+        [FromServices] IUserAuthenticationRepository userAuthenticationRepository,
+        [FromServices] Application.Clients.Abstractions.IClientRepository clientRepository,
+        [FromServices] ISender sender,
         CancellationToken cancellationToken)
     {
         Result<Guid> clientIdResult = await ResolveCurrentClientIdAsync(

@@ -39,6 +39,14 @@ using System.Security.Cryptography;
 using System.Threading.RateLimiting;
 
 var builder = WebApplication.CreateBuilder(args);
+if (builder.Environment.IsDevelopment())
+{
+    builder.Host.UseDefaultServiceProvider(options =>
+    {
+        options.ValidateScopes = false;
+        options.ValidateOnBuild = false;
+    });
+}
 
 builder.Host.UseSerilog((context, services, configuration) =>
 {
@@ -65,7 +73,16 @@ builder.Services.AddAuthentication(JwtBearerDefaults.AuthenticationScheme)
         string audience = jwtSection["Audience"] ?? string.Empty;
         string publicKeyPem = jwtSection["PublicKeyPem"] ?? string.Empty;
 
-        RsaSecurityKey publicKey = JwtKeyUtilities.CreatePublicKey(publicKeyPem);
+        RsaSecurityKey publicKey;
+        try
+        {
+            publicKey = JwtKeyUtilities.CreatePublicKey(publicKeyPem);
+        }
+        catch (Exception) when (builder.Environment.IsDevelopment())
+        {
+            // Keep local startup functional when placeholder JWT keys are present.
+            publicKey = new RsaSecurityKey(RSA.Create(2048));
+        }
         options.TokenValidationParameters = new TokenValidationParameters
         {
             ValidateIssuerSigningKey = true,
@@ -214,19 +231,28 @@ var app = builder.Build();
 using (IServiceScope scope = app.Services.CreateScope())
 {
     IDbInitializer dbInitializer = scope.ServiceProvider.GetRequiredService<IDbInitializer>();
-    await dbInitializer.InitializeAsync();
+    try
+    {
+        await dbInitializer.InitializeAsync();
+    }
+    catch (Exception) when (app.Environment.IsDevelopment())
+    {
+        // Allow local API startup without a fully configured database so OpenAPI/Scalar remains accessible.
+    }
 }
 
 // Configure the HTTP request pipeline.
 if (app.Environment.IsDevelopment())
 {
-    app.MapOpenApi("/openapi/{documentName}.json");
+    app.MapOpenApi("/openapi/{documentName}.json")
+        .AllowAnonymous();
     app.MapScalarApiReference("/scalar/v1", options =>
-    {
-        options.Title = "ClientPortal API";
-        options.OpenApiRoutePattern = "/openapi/{documentName}.json";
-        options.DefaultHttpClient = new(ScalarTarget.CSharp, ScalarClient.HttpClient);
-    });
+        {
+            options.Title = "ClientPortal API";
+            options.OpenApiRoutePattern = "/openapi/{documentName}.json";
+            options.DefaultHttpClient = new(ScalarTarget.CSharp, ScalarClient.HttpClient);
+        })
+        .AllowAnonymous();
 }
 
 app.UseExceptionHandler();
@@ -272,54 +298,61 @@ app.MapNotificationsEndpoints();
 app.MapHub<MessagesHub>("/hubs/messages")
     .RequireTenant()
     .RequireAuthorization();
-RecurringJob.AddOrUpdate<InvoiceReminderJob>(
-    "invoice-reminder-job",
-    job => job.RunAsync(CancellationToken.None),
-    "0 8 * * *",
-    new RecurringJobOptions
-    {
-        TimeZone = TimeZoneInfo.Local
-    });
-RecurringJob.AddOrUpdate<RecurringInvoiceJob>(
-    "recurring-invoice-job",
-    job => job.RunAsync(CancellationToken.None),
-    "15 0 * * *",
-    new RecurringJobOptions
-    {
-        TimeZone = TimeZoneInfo.Local
-    });
-RecurringJob.AddOrUpdate<MeetingReminderJob>(
-    "meeting-reminder-job",
-    job => job.RunAsync(CancellationToken.None),
-    "0 * * * *",
-    new RecurringJobOptions
-    {
-        TimeZone = TimeZoneInfo.Local
-    });
-RecurringJob.AddOrUpdate<DocumentExpiryJob>(
-    "document-expiry-job",
-    job => job.RunAsync(CancellationToken.None),
-    "0 6 * * *",
-    new RecurringJobOptions
-    {
-        TimeZone = TimeZoneInfo.Local
-    });
-RecurringJob.AddOrUpdate<WeeklyDigestJob>(
-    "weekly-digest-job",
-    job => job.RunAsync(CancellationToken.None),
-    "0 7 * * 1",
-    new RecurringJobOptions
-    {
-        TimeZone = TimeZoneInfo.Local
-    });
-RecurringJob.AddOrUpdate<CurrencyRateRefreshJob>(
-    "currency-rate-refresh-job",
-    job => job.RunAsync(CancellationToken.None),
-    "0 */6 * * *",
-    new RecurringJobOptions
-    {
-        TimeZone = TimeZoneInfo.Local
-    });
+try
+{
+    RecurringJob.AddOrUpdate<InvoiceReminderJob>(
+        "invoice-reminder-job",
+        job => job.RunAsync(CancellationToken.None),
+        "0 8 * * *",
+        new RecurringJobOptions
+        {
+            TimeZone = TimeZoneInfo.Local
+        });
+    RecurringJob.AddOrUpdate<RecurringInvoiceJob>(
+        "recurring-invoice-job",
+        job => job.RunAsync(CancellationToken.None),
+        "15 0 * * *",
+        new RecurringJobOptions
+        {
+            TimeZone = TimeZoneInfo.Local
+        });
+    RecurringJob.AddOrUpdate<MeetingReminderJob>(
+        "meeting-reminder-job",
+        job => job.RunAsync(CancellationToken.None),
+        "0 * * * *",
+        new RecurringJobOptions
+        {
+            TimeZone = TimeZoneInfo.Local
+        });
+    RecurringJob.AddOrUpdate<DocumentExpiryJob>(
+        "document-expiry-job",
+        job => job.RunAsync(CancellationToken.None),
+        "0 6 * * *",
+        new RecurringJobOptions
+        {
+            TimeZone = TimeZoneInfo.Local
+        });
+    RecurringJob.AddOrUpdate<WeeklyDigestJob>(
+        "weekly-digest-job",
+        job => job.RunAsync(CancellationToken.None),
+        "0 7 * * 1",
+        new RecurringJobOptions
+        {
+            TimeZone = TimeZoneInfo.Local
+        });
+    RecurringJob.AddOrUpdate<CurrencyRateRefreshJob>(
+        "currency-rate-refresh-job",
+        job => job.RunAsync(CancellationToken.None),
+        "0 */6 * * *",
+        new RecurringJobOptions
+        {
+            TimeZone = TimeZoneInfo.Local
+        });
+}
+catch (Exception) when (app.Environment.IsDevelopment())
+{
+    // Allow local API startup for documentation when infrastructure dependencies are not available.
+}
 
 var summaries = new[]
 {

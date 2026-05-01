@@ -7,6 +7,7 @@ using Application.Messaging;
 using Application.Messaging.Dtos;
 using MediatR;
 using Microsoft.AspNetCore.Http;
+using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.Routing;
 using System.Security.Claims;
 using Shared;
@@ -213,8 +214,8 @@ public static class CommunicationEndpoints
         Guid id,
         Guid messageId,
         ClaimsPrincipal principal,
-        DeleteMessageRequest request,
-        ISender sender,
+        [FromBody] DeleteMessageRequest request,
+        [FromServices] ISender sender,
         CancellationToken cancellationToken)
     {
         Result<Guid> userIdResult = ResolveUserId(principal);
