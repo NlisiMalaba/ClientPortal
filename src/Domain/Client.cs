@@ -68,8 +68,6 @@ public sealed class Client : AggregateRoot<Guid>
             invitedAt,
             null,
             notes);
-
-        client.AddDomainEvent(new ClientInvitedEvent(client.Id, invitedAt));
         return client;
     }
 
@@ -154,6 +152,32 @@ public sealed class Client : AggregateRoot<Guid>
         Status = ClientStatus.Inactive;
         MarkUpdated();
         AddDomainEvent(new ClientDeactivatedEvent(Id, timestamp));
+    }
+
+    public void RaiseInvitedEvent(
+        Guid clientUserId,
+        string recipientEmail,
+        string contactName,
+        string inviteToken,
+        DateTime invitedAtUtc)
+    {
+        if (clientUserId == Guid.Empty)
+        {
+            throw new ArgumentException("Client user id cannot be empty.", nameof(clientUserId));
+        }
+
+        string normalizedRecipientEmail = NormalizeRequiredText(recipientEmail, nameof(recipientEmail));
+        string normalizedContactName = NormalizeRequiredText(contactName, nameof(contactName));
+        string normalizedInviteToken = NormalizeRequiredText(inviteToken, nameof(inviteToken));
+        DateTime normalizedInvitedAt = NormalizeUtc(invitedAtUtc);
+
+        AddDomainEvent(new ClientInvitedEvent(
+            Id,
+            clientUserId,
+            normalizedRecipientEmail,
+            normalizedContactName,
+            normalizedInviteToken,
+            normalizedInvitedAt));
     }
 
     private static void EnsureStatusConsistency(ClientStatus status, DateTime? onboardedAt)

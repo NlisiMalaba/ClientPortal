@@ -1,3 +1,9 @@
 namespace Domain;
 
-public sealed record ClientInvitedEvent(Guid ClientId, DateTime InvitedAt) : IDomainEvent;
+public sealed record ClientInvitedEvent(
+    Guid ClientId,
+    Guid ClientUserId,
+    string RecipientEmail,
+    string ContactName,
+    string InviteToken,
+    DateTime InvitedAt) : IDomainEvent;

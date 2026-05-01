@@ -81,13 +81,44 @@ public sealed class EmailNotificationService : INotificationChannelHandler
         email.Subject = message.Subject;
 
         string html = BuildBrandedHtmlBody(message.Subject, message.Body);
-        email.Body = new BodyBuilder
+        BodyBuilder bodyBuilder = new()
         {
             HtmlBody = html,
             TextBody = message.Body
-        }.ToMessageBody();
+        };
+
+        TryAddAttachmentFromMetadata(message, bodyBuilder);
+        email.Body = bodyBuilder.ToMessageBody();
 
         return email;
+    }
+
+    private static void TryAddAttachmentFromMetadata(NotificationMessage message, BodyBuilder bodyBuilder)
+    {
+        if (message.Metadata is null)
+        {
+            return;
+        }
+
+        if (!message.Metadata.TryGetValue("attachment.fileName", out string? fileName)
+            || string.IsNullOrWhiteSpace(fileName))
+        {
+            return;
+        }
+
+        if (!message.Metadata.TryGetValue("attachment.base64", out string? attachmentBase64)
+            || string.IsNullOrWhiteSpace(attachmentBase64))
+        {
+            return;
+        }
+
+        string contentType = message.Metadata.TryGetValue("attachment.contentType", out string? rawContentType)
+            && !string.IsNullOrWhiteSpace(rawContentType)
+            ? rawContentType
+            : "application/octet-stream";
+
+        byte[] attachmentBytes = Convert.FromBase64String(attachmentBase64);
+        bodyBuilder.Attachments.Add(fileName.Trim(), attachmentBytes, ContentType.Parse(contentType));
     }
 
     private string BuildBrandedHtmlBody(string subject, string body)

@@ -1,6 +1,8 @@
 using Application.Abstractions;
+using Application.Auth.Abstractions;
 using Application.Messaging.Abstractions;
 using Application.Messaging.Dtos;
+using Application.Notifications.Abstractions;
 using Domain;
 using MediatR;
 
@@ -13,6 +15,8 @@ public sealed class MessageSentEventHandler : INotificationHandler<MessageSentEv
     private readonly IMessageThreadRepository _messageThreadRepository;
     private readonly IMessageRepository _messageRepository;
     private readonly ICurrentTenant _currentTenant;
+    private readonly IUserAuthenticationRepository _userAuthenticationRepository;
+    private readonly INotificationService _notificationService;
     private readonly IUserPresenceService _userPresenceService;
     private readonly IMessageOfflineFallbackNotifier _offlineFallbackNotifier;
     private readonly IRealtimeMessagingService _realtimeMessagingService;
@@ -21,6 +25,8 @@ public sealed class MessageSentEventHandler : INotificationHandler<MessageSentEv
         IMessageThreadRepository messageThreadRepository,
         IMessageRepository messageRepository,
         ICurrentTenant currentTenant,
+        IUserAuthenticationRepository userAuthenticationRepository,
+        INotificationService notificationService,
         IUserPresenceService userPresenceService,
         IMessageOfflineFallbackNotifier offlineFallbackNotifier,
         IRealtimeMessagingService realtimeMessagingService)
@@ -28,6 +34,8 @@ public sealed class MessageSentEventHandler : INotificationHandler<MessageSentEv
         _messageThreadRepository = messageThreadRepository;
         _messageRepository = messageRepository;
         _currentTenant = currentTenant;
+        _userAuthenticationRepository = userAuthenticationRepository;
+        _notificationService = notificationService;
         _userPresenceService = userPresenceService;
         _offlineFallbackNotifier = offlineFallbackNotifier;
         _realtimeMessagingService = realtimeMessagingService;
@@ -65,10 +73,10 @@ public sealed class MessageSentEventHandler : INotificationHandler<MessageSentEv
 
         await _realtimeMessagingService.BroadcastMessageAsync(payload, cancellationToken);
 
-        await NotifyOfflineParticipantsAsync(message, cancellationToken);
+        await NotifyParticipantsAsync(message, cancellationToken);
     }
 
-    private async Task NotifyOfflineParticipantsAsync(Message message, CancellationToken cancellationToken)
+    private async Task NotifyParticipantsAsync(Message message, CancellationToken cancellationToken)
     {
         Domain.MessageThread? thread = await _messageThreadRepository.FindByIdAsync(message.ThreadId, cancellationToken);
         if (thread is null)
@@ -76,6 +84,39 @@ public sealed class MessageSentEventHandler : INotificationHandler<MessageSentEv
             return;
         }
 
+        await SendInAppNotificationsAsync(thread, message, cancellationToken);
+        await NotifyOfflineParticipantsAsync(thread, message, cancellationToken);
+    }
+
+    private async Task SendInAppNotificationsAsync(Domain.MessageThread thread, Message message, CancellationToken cancellationToken)
+    {
+        Dictionary<string, string> metadata = new(StringComparer.Ordinal)
+        {
+            ["threadId"] = message.ThreadId.ToString(),
+            ["messageId"] = message.Id.ToString(),
+            ["senderId"] = message.SenderId.ToString()
+        };
+
+        string body = BuildMessagePreviewBody(message.Content);
+
+        foreach (Guid participantId in thread.Participants.Where(id => id != message.SenderId))
+        {
+            await _notificationService.SendAsync(
+                new NotificationMessage(
+                    NotificationChannel.InApp,
+                    participantId.ToString(),
+                    "New message",
+                    body,
+                    metadata),
+                cancellationToken);
+        }
+    }
+
+    private async Task NotifyOfflineParticipantsAsync(
+        Domain.MessageThread thread,
+        Message message,
+        CancellationToken cancellationToken)
+    {
         int offlineThresholdSeconds = Math.Max(0, _currentTenant.Settings?.OfflineFallbackThresholdSeconds ?? 0);
         if (offlineThresholdSeconds == 0)
         {
@@ -104,6 +145,11 @@ public sealed class MessageSentEventHandler : INotificationHandler<MessageSentEv
                 continue;
             }
 
+            if (enabledChannels.Contains("email", StringComparer.OrdinalIgnoreCase))
+            {
+                await TrySendOfflineEmailAsync(participantId, message, cancellationToken);
+            }
+
             await _offlineFallbackNotifier.NotifyRecipientAsync(
                 participantId,
                 message.ThreadId,
@@ -111,5 +157,41 @@ public sealed class MessageSentEventHandler : INotificationHandler<MessageSentEv
                 enabledChannels,
                 cancellationToken);
         }
+    }
+
+    private async Task TrySendOfflineEmailAsync(Guid recipientUserId, Message message, CancellationToken cancellationToken)
+    {
+        User? recipient = await _userAuthenticationRepository.FindByIdAsync(recipientUserId, cancellationToken);
+        if (recipient is null)
+        {
+            return;
+        }
+
+        Dictionary<string, string> metadata = new(StringComparer.Ordinal)
+        {
+            ["userId"] = recipientUserId.ToString(),
+            ["threadId"] = message.ThreadId.ToString(),
+            ["messageId"] = message.Id.ToString()
+        };
+
+        await _notificationService.SendAsync(
+            new NotificationMessage(
+                NotificationChannel.Email,
+                recipient.Email.Value,
+                "You have a new message",
+                BuildMessagePreviewBody(message.Content),
+                metadata),
+            cancellationToken);
+    }
+
+    private static string BuildMessagePreviewBody(string content)
+    {
+        string normalized = string.IsNullOrWhiteSpace(content) ? "You received a new message." : content.Trim();
+        if (normalized.Length <= 160)
+        {
+            return normalized;
+        }
+
+        return $"{normalized[..157]}...";
     }
 }
