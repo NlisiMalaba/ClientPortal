@@ -2,10 +2,11 @@ import { Component, signal } from '@angular/core';
 import { RouterOutlet } from '@angular/router';
 import { ButtonComponent } from '@/components/ui/button.component';
 import { CardComponent } from '@/components/ui/card.component';
+import { ToastHostComponent } from './core/notifications/toast-host.component';
 
 @Component({
   selector: 'app-root',
-  imports: [RouterOutlet, ButtonComponent, CardComponent],
+  imports: [RouterOutlet, ButtonComponent, CardComponent, ToastHostComponent],
   template: `
     <main class="min-h-screen p-6 bg-muted/30">
       <ui-card
@@ -20,6 +21,7 @@ import { CardComponent } from '@/components/ui/card.component';
       </ui-card>
       <router-outlet />
     </main>
+    <app-toast-host />
   `,
   styleUrl: './app.scss',
 })
