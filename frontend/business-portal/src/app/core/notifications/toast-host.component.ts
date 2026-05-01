@@ -1,6 +1,6 @@
 import { ChangeDetectionStrategy, Component, inject } from '@angular/core';
 
-import { ToastNotificationService } from './toast-notification.service';
+import { ToastNotificationService, ToastVariant } from './toast-notification.service';
 
 @Component({
   selector: 'app-toast-host',
@@ -12,7 +12,7 @@ import { ToastNotificationService } from './toast-notification.service';
           class="rounded-md border px-4 py-3 shadow-md text-sm"
           [class]="resolveClass(notification.variant)"
           role="status"
-          aria-live="polite"
+          [attr.aria-live]="liveRegionPoliteness(notification.variant)"
         >
           <div class="flex items-start justify-between gap-3">
             <p>{{ notification.message }}</p>
@@ -34,7 +34,7 @@ import { ToastNotificationService } from './toast-notification.service';
 export class ToastHostComponent {
   readonly toastService = inject(ToastNotificationService);
 
-  resolveClass(variant: string): string {
+  resolveClass(variant: ToastVariant): string {
     switch (variant) {
       case 'error':
         return 'border-red-200 bg-red-50 text-red-700';
@@ -45,5 +45,9 @@ export class ToastHostComponent {
       default:
         return 'border-blue-200 bg-blue-50 text-blue-700';
     }
+  }
+
+  liveRegionPoliteness(variant: ToastVariant): 'assertive' | 'polite' {
+    return variant === 'error' ? 'assertive' : 'polite';
   }
 }
