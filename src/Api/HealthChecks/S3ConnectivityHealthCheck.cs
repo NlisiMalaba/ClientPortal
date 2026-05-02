@@ -5,6 +5,10 @@ using Microsoft.Extensions.Diagnostics.HealthChecks;
 
 namespace Api.HealthChecks;
 
+/// <summary>
+/// Optional connectivity probe for AWS S3–compatible object storage. Registered only when
+/// <c>HealthChecks:S3:Enabled</c> is true in application configuration.
+/// </summary>
 public sealed class S3ConnectivityHealthCheck : IHealthCheck
 {
     private readonly IConfiguration _configuration;

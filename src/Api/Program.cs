@@ -224,7 +224,13 @@ else
     healthChecksBuilder.AddRedis(redisConnectionString, name: "redis");
 }
 
-healthChecksBuilder.AddCheck<S3ConnectivityHealthCheck>("s3", failureStatus: HealthStatus.Unhealthy);
+bool s3HealthCheckEnabled = builder.Configuration.GetValue("HealthChecks:S3:Enabled", false);
+if (s3HealthCheckEnabled)
+{
+    healthChecksBuilder.AddCheck<S3ConnectivityHealthCheck>(
+        "s3",
+        failureStatus: HealthStatus.Unhealthy);
+}
 
 var app = builder.Build();
 

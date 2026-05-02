@@ -53,44 +53,6 @@ services:
     networks:
       - clientportal-network
 
-  minio:
-    image: minio/minio:latest
-    container_name: clientportal-minio
-    restart: unless-stopped
-    command: server /data --console-address ":9001"
-    environment:
-      MINIO_ROOT_USER: ${MINIO_ROOT_USER}
-      MINIO_ROOT_PASSWORD: ${MINIO_ROOT_PASSWORD}
-    ports:
-      - "${MINIO_API_PORT}:9000"
-      - "${MINIO_CONSOLE_PORT}:9001"
-    volumes:
-      - minio_data:/data
-    networks:
-      - clientportal-network
-
-  minio-init:
-    image: minio/mc:latest
-    container_name: clientportal-minio-init
-    depends_on:
-      minio:
-        condition: service_started
-    environment:
-      MINIO_ALIAS: ${MINIO_ALIAS}
-      MINIO_ENDPOINT: ${MINIO_ENDPOINT}
-      MINIO_ROOT_USER: ${MINIO_ROOT_USER}
-      MINIO_ROOT_PASSWORD: ${MINIO_ROOT_PASSWORD}
-      S3_BUCKET: ${S3_BUCKET}
-    volumes:
-      - ./docker/minio/create-buckets.sh:/scripts/create-buckets.sh:ro
-    entrypoint:
-      - /bin/sh
-      - -c
-      - tr -d '\r' < /scripts/create-buckets.sh | /bin/sh
-    restart: "no"
-    networks:
-      - clientportal-network
-
   api:
     build:
       context: .
@@ -104,18 +66,12 @@ services:
         condition: service_healthy
       seq:
         condition: service_started
-      minio:
-        condition: service_started
-      minio-init:
-        condition: service_completed_successfully
     environment:
       ASPNETCORE_ENVIRONMENT: ${ASPNETCORE_ENVIRONMENT}
       ASPNETCORE_URLS: ${ASPNETCORE_URLS}
       ConnectionStrings__Postgres: ${ConnectionStrings__Postgres}
       ConnectionStrings__Redis: ${ConnectionStrings__Redis}
       Serilog__WriteTo__1__Args__serverUrl: ${Serilog__WriteTo__1__Args__serverUrl}
-      HealthChecks__S3__Region: ${HealthChecks__S3__Region}
-      HealthChecks__S3__BucketName: ${HealthChecks__S3__BucketName}
     ports:
       - "${API_PORT}:5000"
     networks:
@@ -171,7 +127,6 @@ volumes:
   postgres_data:
   redis_data:
   seq_data:
-  minio_data:
 
 networks:
   clientportal-network:
