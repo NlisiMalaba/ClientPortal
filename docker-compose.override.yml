@@ -1,5 +1,6 @@
 services:
   api:
+    build: !reset
     image: mcr.microsoft.com/dotnet/sdk:10.0
     container_name: clientportal-api-dev
     working_dir: /src/src/Api
@@ -11,10 +12,11 @@ services:
       - ${APPDATA}/Microsoft/UserSecrets:/root/.microsoft/usersecrets:ro
       - ${USERPROFILE}/.aspnet/https:/https:ro
     environment:
-      ASPNETCORE_ENVIRONMENT: Development
-      ASPNETCORE_URLS: http://0.0.0.0:5000
+      ASPNETCORE_ENVIRONMENT: ${ASPNETCORE_ENVIRONMENT}
+      ASPNETCORE_URLS: ${ASPNETCORE_URLS}
 
   client-app:
+    build: !reset
     image: node:22-alpine
     container_name: clientportal-client-app-dev
     working_dir: /workspace/client-portal
@@ -25,9 +27,10 @@ services:
       - ./frontend:/workspace
       - /workspace/client-portal/node_modules
     environment:
-      NODE_ENV: development
+      NODE_ENV: ${NODE_ENV_DEVELOPMENT}
 
   business-app:
+    build: !reset
     image: node:22-alpine
     container_name: clientportal-business-app-dev
     working_dir: /workspace/business-portal
@@ -38,4 +41,4 @@ services:
       - ./frontend:/workspace
       - /workspace/business-portal/node_modules
     environment:
-      NODE_ENV: development
+      NODE_ENV: ${NODE_ENV_DEVELOPMENT}

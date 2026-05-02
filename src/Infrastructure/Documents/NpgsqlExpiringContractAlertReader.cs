@@ -1,4 +1,5 @@
 using Application.Documents.Abstractions;
+using Infrastructure.Persistence;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.Logging;
 using Npgsql;
@@ -54,14 +55,8 @@ public sealed class NpgsqlExpiringContractAlertReader : IExpiringContractAlertRe
         NpgsqlConnection connection,
         CancellationToken cancellationToken)
     {
-        const string sql = """
-            select slug
-            from public.tenants
-            where is_active = true;
-            """;
-
         List<string> tenantSlugs = [];
-        await using NpgsqlCommand command = new(sql, connection);
+        await using NpgsqlCommand command = new(PublicTenantActiveSlugsSql.SelectActiveTenantSlugs, connection);
         await using NpgsqlDataReader reader = await command.ExecuteReaderAsync(cancellationToken);
         while (await reader.ReadAsync(cancellationToken))
         {

@@ -286,7 +286,8 @@ app.UseHangfireDashboard(
     {
         Authorization = [new OwnerDashboardAuthorizationFilter()]
     });
-app.MapHealthChecks("/health", new HealthCheckOptions());
+app.MapHealthChecks("/health", new HealthCheckOptions())
+    .AllowAnonymous();
 app.MapAuthEndpoints();
 app.MapClientsEndpoints();
 app.MapProjectsEndpoints();
