@@ -5,7 +5,7 @@
 namespace Infrastructure.Persistence.Migrations
 {
     /// <inheritdoc />
-    public partial class InitialTenantSchema : Migration
+    public partial class TenantNotificationPrefsExplicitConversion : Migration
     {
         /// <inheritdoc />
         protected override void Up(MigrationBuilder migrationBuilder)

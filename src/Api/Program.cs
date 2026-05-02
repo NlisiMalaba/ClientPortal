@@ -21,6 +21,7 @@ using Api.Tenancy;
 using Hangfire;
 using Hangfire.PostgreSql;
 using Infrastructure;
+using Infrastructure.Auth;
 using Infrastructure.Persistence;
 using Microsoft.AspNetCore.Authentication;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
@@ -35,7 +36,6 @@ using Microsoft.OpenApi;
 using Scalar.AspNetCore;
 using Serilog;
 using Serilog.Events;
-using System.Security.Cryptography;
 using System.Threading.RateLimiting;
 
 var builder = WebApplication.CreateBuilder(args);
@@ -73,16 +73,7 @@ builder.Services.AddAuthentication(JwtBearerDefaults.AuthenticationScheme)
         string audience = jwtSection["Audience"] ?? string.Empty;
         string publicKeyPem = jwtSection["PublicKeyPem"] ?? string.Empty;
 
-        RsaSecurityKey publicKey;
-        try
-        {
-            publicKey = JwtKeyUtilities.CreatePublicKey(publicKeyPem);
-        }
-        catch (Exception) when (builder.Environment.IsDevelopment())
-        {
-            // Keep local startup functional when placeholder JWT keys are present.
-            publicKey = new RsaSecurityKey(RSA.Create(2048));
-        }
+        RsaSecurityKey publicKey = JwtRsaKeyFactory.CreatePublicKey(publicKeyPem);
         options.TokenValidationParameters = new TokenValidationParameters
         {
             ValidateIssuerSigningKey = true,
@@ -224,7 +215,13 @@ else
     healthChecksBuilder.AddRedis(redisConnectionString, name: "redis");
 }
 
-healthChecksBuilder.AddCheck<S3ConnectivityHealthCheck>("s3", failureStatus: HealthStatus.Unhealthy);
+bool s3HealthCheckEnabled = builder.Configuration.GetValue("HealthChecks:S3:Enabled", false);
+if (s3HealthCheckEnabled)
+{
+    healthChecksBuilder.AddCheck<S3ConnectivityHealthCheck>(
+        "s3",
+        failureStatus: HealthStatus.Unhealthy);
+}
 
 var app = builder.Build();
 
@@ -430,18 +427,3 @@ internal static class CorsPolicyNames
     public const string Default = "DefaultCorsPolicy";
 }
 
-internal static class JwtKeyUtilities
-{
-    public static RsaSecurityKey CreatePublicKey(string publicKeyPem)
-    {
-        if (string.IsNullOrWhiteSpace(publicKeyPem))
-        {
-            throw new InvalidOperationException("Jwt:PublicKeyPem must be configured.");
-        }
-
-        string normalizedPem = publicKeyPem.Replace("\\n", "\n").Trim();
-        RSA rsa = RSA.Create();
-        rsa.ImportFromPem(normalizedPem);
-        return new RsaSecurityKey(rsa);
-    }
-}

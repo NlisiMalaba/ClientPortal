@@ -4,13 +4,23 @@ import { Observable } from 'rxjs';
 
 type QueryValue = string | number | boolean | null | undefined;
 type QueryParams = object;
+type RequestOptions = {
+  withCredentials?: boolean;
+};
 
 @Injectable({ providedIn: 'root' })
 export class ApiClientService {
   constructor(private readonly httpClient: HttpClient) {}
 
-  get<TResponse>(url: string, query?: QueryParams): Observable<TResponse> {
-    return this.httpClient.get<TResponse>(url, { params: this.toHttpParams(query) });
+  get<TResponse>(
+    url: string,
+    query?: QueryParams,
+    options?: RequestOptions,
+  ): Observable<TResponse> {
+    return this.httpClient.get<TResponse>(url, {
+      params: this.toHttpParams(query),
+      withCredentials: options?.withCredentials,
+    });
   }
 
   getBlob(url: string, query?: QueryParams): Observable<Blob> {
@@ -24,9 +34,11 @@ export class ApiClientService {
     url: string,
     body?: TBody,
     query?: QueryParams,
+    options?: RequestOptions,
   ): Observable<TResponse> {
     return this.httpClient.post<TResponse>(url, body, {
       params: this.toHttpParams(query),
+      withCredentials: options?.withCredentials,
     });
   }
 
@@ -34,15 +46,22 @@ export class ApiClientService {
     url: string,
     body: TBody,
     query?: QueryParams,
+    options?: RequestOptions,
   ): Observable<TResponse> {
     return this.httpClient.put<TResponse>(url, body, {
       params: this.toHttpParams(query),
+      withCredentials: options?.withCredentials,
     });
   }
 
-  delete<TResponse>(url: string, query?: QueryParams): Observable<TResponse> {
+  delete<TResponse>(
+    url: string,
+    query?: QueryParams,
+    options?: RequestOptions,
+  ): Observable<TResponse> {
     return this.httpClient.delete<TResponse>(url, {
       params: this.toHttpParams(query),
+      withCredentials: options?.withCredentials,
     });
   }
 

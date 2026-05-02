@@ -2,6 +2,17 @@ import { Routes } from '@angular/router';
 
 export const CLIENTS_ROUTES: Routes = [
   {
+    path: 'invite-onboarding',
+    loadComponent: () =>
+      import('./client-invite-onboarding.component').then(
+        (m) => m.ClientInviteOnboardingComponent,
+      ),
+    data: {
+      title: 'Invite & Onboarding',
+      description: 'Invite clients and track onboarding completion.',
+    },
+  },
+  {
     path: '',
     loadComponent: () =>
       import('./clients-list.component').then((m) => m.ClientsListComponent),

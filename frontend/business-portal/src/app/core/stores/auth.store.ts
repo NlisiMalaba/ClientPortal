@@ -42,7 +42,12 @@ export const AuthStore = signalStore(
     ) => {
       const applyTokens = (response: LoginResponse): void => {
         tokenStorage.setAccessToken(response.accessToken);
-        tokenStorage.setRefreshToken(response.refreshToken);
+        const refreshToken = (response as { refreshToken?: unknown }).refreshToken;
+        if (typeof refreshToken === 'string' && refreshToken.trim() !== '') {
+          tokenStorage.setRefreshToken(refreshToken);
+        } else {
+          tokenStorage.clearRefreshToken();
+        }
         tenantContext.syncTenantIdFromAccessToken(response.accessToken);
 
         patchState(store, {
@@ -121,9 +126,7 @@ export const AuthStore = signalStore(
         const refreshToken = tokenStorage.getRefreshToken();
         patchState(store, { isLoading: true, error: null });
         try {
-          if (refreshToken !== null) {
-            await firstValueFrom(authApiService.logout(refreshToken));
-          }
+          await firstValueFrom(authApiService.logout(refreshToken ?? undefined));
         } finally {
           clearSession();
           patchState(store, { isLoading: false });

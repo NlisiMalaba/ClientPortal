@@ -32,15 +32,14 @@ export class AuthSessionService {
     }
 
     const refreshToken = this.tokenStorage.getRefreshToken();
-    if (refreshToken === null) {
-      return of(null);
-    }
-
-    const requestBody: RefreshTokenRequest = { refreshToken };
+    const requestBody =
+      refreshToken !== null && refreshToken.trim() !== ''
+        ? ({ refreshToken } satisfies RefreshTokenRequest)
+        : undefined;
     const refreshUrl = this.buildRefreshUrl();
 
     this.refreshInFlight$ = this.httpClient
-      .post<RefreshTokenResponse>(refreshUrl, requestBody)
+      .post<RefreshTokenResponse>(refreshUrl, requestBody, { withCredentials: true })
       .pipe(
         map((response) => {
           this.tokenStorage.setAccessToken(response.accessToken);

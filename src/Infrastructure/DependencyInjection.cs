@@ -113,6 +113,10 @@ public static class DependencyInjection
         services.AddScoped<IOnboardingChecklistRepository, OnboardingChecklistRepository>();
         services.AddSingleton<IJwtTokenService, JwtTokenService>();
         services.AddSingleton<IRefreshTokenService, Argon2RefreshTokenService>();
+        services.AddSingleton<IPasswordHasher, Argon2PasswordHasher>();
+        services.AddScoped<IBusinessRegistrationService, BusinessRegistrationService>();
+        services.AddScoped<IUserAuthenticationRepository, UserAuthenticationRepository>();
+        services.AddScoped<IAccessTokenIssuer, JwtAccessTokenIssuer>();
         services.AddScoped<ITenantDbContextFactory, TenantDbContextFactory>();
         services.AddScoped<IUnitOfWork, UnitOfWork>();
         services.AddScoped<ITenantProvisioner, TenantProvisioner>();

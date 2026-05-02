@@ -9,11 +9,16 @@ services:
              dotnet run --no-launch-profile --urls http://0.0.0.0:5000"
     volumes:
       - ./:/src
+      - ${USERPROFILE}/.nuget/packages:/root/.nuget/packages
       - ${APPDATA}/Microsoft/UserSecrets:/root/.microsoft/usersecrets:ro
       - ${USERPROFILE}/.aspnet/https:/https:ro
     environment:
       ASPNETCORE_ENVIRONMENT: ${ASPNETCORE_ENVIRONMENT}
       ASPNETCORE_URLS: ${ASPNETCORE_URLS}
+      Jwt__Issuer: ${Jwt__Issuer:-client-portal}
+      Jwt__Audience: ${Jwt__Audience:-client-portal-api}
+      Jwt__PrivateKeyPem: ${Jwt__PrivateKeyPem}
+      Jwt__PublicKeyPem: ${Jwt__PublicKeyPem}
 
   client-app:
     build: !reset

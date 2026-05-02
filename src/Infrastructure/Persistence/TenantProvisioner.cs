@@ -44,15 +44,38 @@ public sealed class TenantProvisioner : ITenantProvisioner
         _logger.LogInformation("Provisioned tenant schema {SchemaName} for slug {TenantSlug}.", schemaName, normalizedSlug);
     }
 
-    private async Task CreateSchemaIfNotExistsAsync(string schemaName, CancellationToken cancellationToken)
+    public async Task DropTenantSchemaAsync(string slug, CancellationToken cancellationToken = default)
+    {
+        string normalizedSlug = NormalizeSlug(slug);
+        string schemaName = $"tenant_{normalizedSlug.Replace('-', '_')}";
+
+        await using NpgsqlConnection connection = await OpenPublicSearchPathConnectionAsync(cancellationToken);
+
+        string sql = $"DROP SCHEMA IF EXISTS \"{schemaName}\" CASCADE;";
+        await using NpgsqlCommand command = new(sql, connection);
+        await command.ExecuteNonQueryAsync(cancellationToken);
+
+        _logger.LogWarning(
+            "Dropped tenant schema {SchemaName} after provisioning rollback for slug {TenantSlug}.",
+            schemaName,
+            normalizedSlug);
+    }
+
+    private async Task<NpgsqlConnection> OpenPublicSearchPathConnectionAsync(CancellationToken cancellationToken)
     {
         NpgsqlConnectionStringBuilder builder = new(_postgresConnectionString)
         {
-            SearchPath = "public"
+            SearchPath = "public",
         };
 
-        await using NpgsqlConnection connection = new(builder.ConnectionString);
+        NpgsqlConnection connection = new(builder.ConnectionString);
         await connection.OpenAsync(cancellationToken);
+        return connection;
+    }
+
+    private async Task CreateSchemaIfNotExistsAsync(string schemaName, CancellationToken cancellationToken)
+    {
+        await using NpgsqlConnection connection = await OpenPublicSearchPathConnectionAsync(cancellationToken);
 
         string sql = $"CREATE SCHEMA IF NOT EXISTS \"{schemaName}\";";
         await using NpgsqlCommand command = new(sql, connection);

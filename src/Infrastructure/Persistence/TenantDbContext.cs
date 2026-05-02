@@ -1,10 +1,11 @@
 using Application.Abstractions;
-using Domain;
+using Infrastructure.Persistence.Configurations;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Metadata;
 using Microsoft.Extensions.Configuration;
 using Npgsql;
 using Shared;
+using System.Linq;
 using System.Text;
 
 namespace Infrastructure.Persistence;
@@ -47,18 +48,13 @@ public sealed class TenantDbContext : DbContext
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
-        modelBuilder.HasDefaultSchema(GetTenantSchema());
-        ConfigureNotificationPreferences(modelBuilder);
+        // Do not call HasDefaultSchema with the tenant slug: migration snapshots would bake in
+        // design-time schema (e.g. tenant_design_time) while runtime uses tenant_{slug}, which
+        // triggers PendingModelChangesWarning on MigrateAsync. PostgreSQL resolves unqualified
+        // identifiers via connection SearchPath (set per tenant in OnConfiguring).
+        modelBuilder.ApplyConfiguration(new UserConfiguration());
+        modelBuilder.ApplyConfiguration(new UserNotificationPreferencesConfiguration());
         ApplySnakeCaseConventions(modelBuilder);
-    }
-
-    private static void ConfigureNotificationPreferences(ModelBuilder modelBuilder)
-    {
-        modelBuilder.Entity<UserNotificationPreferences>(entity =>
-        {
-            entity.HasKey(preferences => preferences.Id);
-            entity.HasIndex(preferences => preferences.UserId).IsUnique();
-        });
     }
 
     private string GetTenantSchema()
@@ -73,15 +69,19 @@ public sealed class TenantDbContext : DbContext
         return _tenantSchema;
     }
 
+    /// <summary>
+    /// Snake_case naming with deterministic ordering; skips unset EF identifiers so we never persist
+    /// empty constraint names (that can make the model appear to change between builds).
+    /// </summary>
     private static void ApplySnakeCaseConventions(ModelBuilder modelBuilder)
     {
-        foreach (IMutableEntityType entity in modelBuilder.Model.GetEntityTypes())
-        {
-            if (entity.IsOwned())
-            {
-                continue;
-            }
+        List<IMutableEntityType> entityTypes = modelBuilder.Model.GetEntityTypes()
+            .Where(static entity => !entity.IsOwned())
+            .OrderBy(static entity => entity.Name, StringComparer.Ordinal)
+            .ToList();
 
+        foreach (IMutableEntityType entity in entityTypes)
+        {
             string tableName = entity.GetTableName() ?? entity.DisplayName();
             entity.SetTableName(ToSnakeCase(tableName));
 
@@ -92,17 +92,29 @@ public sealed class TenantDbContext : DbContext
 
             foreach (IMutableKey key in entity.GetKeys())
             {
-                key.SetName(ToSnakeCase(key.GetName() ?? string.Empty));
+                string? keyName = key.GetName();
+                if (!string.IsNullOrEmpty(keyName))
+                {
+                    key.SetName(ToSnakeCase(keyName));
+                }
             }
 
             foreach (IMutableForeignKey foreignKey in entity.GetForeignKeys())
             {
-                foreignKey.SetConstraintName(ToSnakeCase(foreignKey.GetConstraintName() ?? string.Empty));
+                string? constraintName = foreignKey.GetConstraintName();
+                if (!string.IsNullOrEmpty(constraintName))
+                {
+                    foreignKey.SetConstraintName(ToSnakeCase(constraintName));
+                }
             }
 
             foreach (IMutableIndex index in entity.GetIndexes())
             {
-                index.SetDatabaseName(ToSnakeCase(index.GetDatabaseName() ?? string.Empty));
+                string? databaseName = index.GetDatabaseName();
+                if (!string.IsNullOrEmpty(databaseName))
+                {
+                    index.SetDatabaseName(ToSnakeCase(databaseName));
+                }
             }
         }
     }
