@@ -2,7 +2,7 @@ import { Injectable } from '@angular/core';
 import { Observable, map } from 'rxjs';
 
 import { ApiClientService } from '../api-client.service';
-import { ApiOperationResult } from '../models';
+import { ApiEnvelope, ApiOperationResult } from '../models';
 
 export interface LoginRequest {
   email: string;
@@ -42,20 +42,6 @@ export interface RegisterBusinessResult {
   tenantSlug: string;
 }
 
-export interface ApiErrorDto {
-  code: string;
-  message: string;
-  type?: string | null;
-}
-
-/** API `ApiResponse<T>` envelope. */
-export interface ApiEnvelope<T> {
-  success: boolean;
-  data: T | null;
-  errors: ApiErrorDto[];
-  meta: Record<string, unknown>;
-}
-
 export interface ForgotPasswordRequest {
   email: string;
 }
@@ -66,10 +52,8 @@ export interface ResetPasswordRequest {
 }
 
 export interface AcceptInvitationRequest {
-  invitationToken: string;
+  token: string;
   password: string;
-  firstName?: string;
-  lastName?: string;
 }
 
 @Injectable({ providedIn: 'root' })

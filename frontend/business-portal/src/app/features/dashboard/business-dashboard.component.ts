@@ -7,6 +7,9 @@ import {
   signal,
 } from '@angular/core';
 import { isPlatformBrowser } from '@angular/common';
+import { ActivatedRoute } from '@angular/router';
+import { ClientInviteOnboardingComponent } from '../clients/client-invite-onboarding.component';
+import { ClientsListComponent } from '../clients/clients-list.component';
 
 interface DashboardStat {
   readonly label: string;
@@ -54,6 +57,7 @@ interface RecentActivityItem {
   selector: 'app-business-dashboard',
   standalone: true,
   changeDetection: ChangeDetectionStrategy.OnPush,
+  imports: [ClientInviteOnboardingComponent, ClientsListComponent],
   template: `
     <div class="min-h-screen bg-muted/30 text-foreground">
       <div class="flex min-h-screen">
@@ -129,10 +133,11 @@ interface RecentActivityItem {
                       href="#"
                       [attr.title]="sidebarCollapsed() ? item.label : null"
                       class="flex items-center rounded-lg px-3 py-2 text-sm transition-colors"
-                      [class.bg-sidebar-accent]="item.active"
-                      [class.text-sidebar-accent-foreground]="item.active"
-                      [class.text-muted-foreground]="!item.active"
-                      [class.hover:bg-muted]="!item.active"
+                      [class.bg-sidebar-accent]="isItemActive(item.id)"
+                      [class.text-sidebar-accent-foreground]="isItemActive(item.id)"
+                      [class.text-muted-foreground]="!isItemActive(item.id)"
+                      [class.hover:bg-muted]="!isItemActive(item.id)"
+                      (click)="onSidebarItemClick($event, item.id)"
                     >
                       <svg class="h-5 w-5 shrink-0" viewBox="0 0 24 24" fill="none" stroke="currentColor">
                         <path
@@ -221,140 +226,146 @@ interface RecentActivityItem {
             </div>
           </header>
 
-          <main class="space-y-6 p-4 sm:p-6">
-            <section class="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-4" aria-label="Summary metrics">
-              @for (stat of stats; track stat.label) {
-                <article class="rounded-xl border bg-card p-4 shadow-sm">
-                  <div class="flex items-start justify-between gap-4">
-                    <div>
-                      <p class="text-sm text-muted-foreground">{{ stat.label }}</p>
-                      <p class="mt-2 text-3xl font-semibold">{{ stat.value }}</p>
-                      <p class="mt-2 text-sm" [class.text-emerald-600]="stat.trendDirection === 'up'" [class.text-red-600]="stat.trendDirection === 'down'">
-                        {{ stat.trendDirection === 'up' ? '+' : '-' }}{{ stat.trendValue }}
-                        <span class="text-muted-foreground">{{ stat.trendLabel }}</span>
-                      </p>
-                    </div>
-                    <span class="grid h-10 w-10 place-content-center rounded-lg bg-muted text-muted-foreground">
-                      <svg class="h-5 w-5" viewBox="0 0 24 24" fill="none" stroke="currentColor">
-                        <path
-                          [attr.d]="stat.iconPath"
-                          stroke-linecap="round"
-                          stroke-linejoin="round"
-                          stroke-width="2"
-                        />
-                      </svg>
-                    </span>
-                  </div>
-                </article>
-              }
-            </section>
-
-            <section class="grid grid-cols-1 gap-6 xl:grid-cols-[2fr_1fr]">
-              <article class="rounded-xl border bg-card p-4 shadow-sm sm:p-6">
-                <div class="mb-4 flex items-center justify-between gap-2">
-                  <div>
-                    <h2 class="font-semibold">Overview</h2>
-                    <p class="text-sm text-muted-foreground">Monthly revenue performance for the current year.</p>
-                  </div>
-                </div>
-
-                <div class="rounded-lg bg-gradient-to-b from-orange-100/80 to-transparent p-4 dark:from-orange-950/20">
-                  <svg class="h-60 w-full" viewBox="0 0 640 240" preserveAspectRatio="none">
-                    <polyline
-                      points="0,210 58,198 116,203 174,170 232,160 290,172 348,148 406,138 464,126 522,132 580,116 638,102"
-                      fill="none"
-                      stroke="var(--color-chart-1)"
-                      stroke-width="4"
-                      stroke-linecap="round"
-                      stroke-linejoin="round"
-                    />
-                  </svg>
-                </div>
-
-                <div class="mt-3 grid grid-cols-6 gap-1 text-center text-xs text-muted-foreground">
-                  @for (point of revenueSeries; track point.month) {
-                    <span>{{ point.month }}</span>
-                  }
-                </div>
-              </article>
-
-              <div class="space-y-6">
-                <article class="rounded-xl border bg-card p-4 shadow-sm sm:p-6">
-                  <h2 class="font-semibold">Traffic Sources</h2>
-                  <p class="text-sm text-muted-foreground">Where your visitors come from.</p>
-
-                  <div class="mt-4 flex items-center gap-4">
-                    <div class="relative h-32 w-32 rounded-full" [style.background]="trafficGradient()">
-                      <div class="absolute inset-5 grid place-content-center rounded-full bg-card text-center">
-                        <span class="text-2xl font-semibold">284K</span>
-                        <span class="text-xs text-muted-foreground">visits</span>
+          @if (activeView() === 'client-invite-onboard') {
+            <app-client-invite-onboarding />
+          } @else if (activeView() === 'client-list') {
+            <app-clients-list />
+          } @else {
+            <main class="space-y-6 p-4 sm:p-6">
+              <section class="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-4" aria-label="Summary metrics">
+                @for (stat of stats; track stat.label) {
+                  <article class="rounded-xl border bg-card p-4 shadow-sm">
+                    <div class="flex items-start justify-between gap-4">
+                      <div>
+                        <p class="text-sm text-muted-foreground">{{ stat.label }}</p>
+                        <p class="mt-2 text-3xl font-semibold">{{ stat.value }}</p>
+                        <p class="mt-2 text-sm" [class.text-emerald-600]="stat.trendDirection === 'up'" [class.text-red-600]="stat.trendDirection === 'down'">
+                          {{ stat.trendDirection === 'up' ? '+' : '-' }}{{ stat.trendValue }}
+                          <span class="text-muted-foreground">{{ stat.trendLabel }}</span>
+                        </p>
                       </div>
-                    </div>
-
-                    <ul class="space-y-2 text-sm">
-                      @for (source of trafficSources; track source.name) {
-                        <li class="flex items-center justify-between gap-6">
-                          <span class="flex items-center gap-2">
-                            <span class="h-2.5 w-2.5 rounded-full" [style.background]="source.color"></span>
-                            {{ source.name }}
-                          </span>
-                          <strong>{{ source.percent }}%</strong>
-                        </li>
-                      }
-                    </ul>
-                  </div>
-                </article>
-
-                <article class="rounded-xl border bg-card p-4 shadow-sm sm:p-6">
-                  <h2 class="font-semibold">Monthly Goals</h2>
-                  <p class="text-sm text-muted-foreground">Track progress toward target KPIs.</p>
-
-                  <div class="mt-4 space-y-4">
-                    <div>
-                      <div class="mb-1 flex items-center justify-between text-sm">
-                        <span class="font-medium">Revenue target</span>
-                        <span>{{ monthlyGoalProgress }}%</span>
-                      </div>
-                      <div class="h-2 rounded-full bg-muted">
-                        <div class="h-2 rounded-full bg-chart-1" [style.width.%]="monthlyGoalProgress"></div>
-                      </div>
-                    </div>
-                  </div>
-                </article>
-              </div>
-            </section>
-
-            <section class="rounded-xl border bg-card p-4 shadow-sm sm:p-6">
-              <h2 class="font-semibold">Recent Activity</h2>
-              <p class="text-sm text-muted-foreground">Latest operational updates across clients and finance.</p>
-
-              <ul class="mt-4 space-y-3">
-                @for (item of recentActivity; track item.id) {
-                  <li class="flex flex-col gap-2 rounded-lg border p-3 sm:flex-row sm:items-center sm:justify-between">
-                    <div class="space-y-1">
-                      <p class="font-medium">{{ item.title }}</p>
-                      <p class="text-sm text-muted-foreground">{{ item.description }}</p>
-                    </div>
-
-                    <div class="flex items-center gap-3">
-                      <span class="text-xs text-muted-foreground">{{ item.timestamp }}</span>
-                      <span
-                        class="rounded-full px-2.5 py-1 text-xs font-medium"
-                        [class.bg-emerald-100]="item.status === 'Paid' || item.status === 'Approved'"
-                        [class.text-emerald-700]="item.status === 'Paid' || item.status === 'Approved'"
-                        [class.bg-sky-100]="item.status === 'Sent'"
-                        [class.text-sky-700]="item.status === 'Sent'"
-                        [class.bg-amber-100]="item.status === 'Pending'"
-                        [class.text-amber-700]="item.status === 'Pending'"
-                      >
-                        {{ item.status }}
+                      <span class="grid h-10 w-10 place-content-center rounded-lg bg-muted text-muted-foreground">
+                        <svg class="h-5 w-5" viewBox="0 0 24 24" fill="none" stroke="currentColor">
+                          <path
+                            [attr.d]="stat.iconPath"
+                            stroke-linecap="round"
+                            stroke-linejoin="round"
+                            stroke-width="2"
+                          />
+                        </svg>
                       </span>
                     </div>
-                  </li>
+                  </article>
                 }
-              </ul>
-            </section>
-          </main>
+              </section>
+
+              <section class="grid grid-cols-1 gap-6 xl:grid-cols-[2fr_1fr]">
+                <article class="rounded-xl border bg-card p-4 shadow-sm sm:p-6">
+                  <div class="mb-4 flex items-center justify-between gap-2">
+                    <div>
+                      <h2 class="font-semibold">Overview</h2>
+                      <p class="text-sm text-muted-foreground">Monthly revenue performance for the current year.</p>
+                    </div>
+                  </div>
+
+                  <div class="rounded-lg bg-gradient-to-b from-orange-100/80 to-transparent p-4 dark:from-orange-950/20">
+                    <svg class="h-60 w-full" viewBox="0 0 640 240" preserveAspectRatio="none">
+                      <polyline
+                        points="0,210 58,198 116,203 174,170 232,160 290,172 348,148 406,138 464,126 522,132 580,116 638,102"
+                        fill="none"
+                        stroke="var(--color-chart-1)"
+                        stroke-width="4"
+                        stroke-linecap="round"
+                        stroke-linejoin="round"
+                      />
+                    </svg>
+                  </div>
+
+                  <div class="mt-3 grid grid-cols-6 gap-1 text-center text-xs text-muted-foreground">
+                    @for (point of revenueSeries; track point.month) {
+                      <span>{{ point.month }}</span>
+                    }
+                  </div>
+                </article>
+
+                <div class="space-y-6">
+                  <article class="rounded-xl border bg-card p-4 shadow-sm sm:p-6">
+                    <h2 class="font-semibold">Traffic Sources</h2>
+                    <p class="text-sm text-muted-foreground">Where your visitors come from.</p>
+
+                    <div class="mt-4 flex items-center gap-4">
+                      <div class="relative h-32 w-32 rounded-full" [style.background]="trafficGradient()">
+                        <div class="absolute inset-5 grid place-content-center rounded-full bg-card text-center">
+                          <span class="text-2xl font-semibold">284K</span>
+                          <span class="text-xs text-muted-foreground">visits</span>
+                        </div>
+                      </div>
+
+                      <ul class="space-y-2 text-sm">
+                        @for (source of trafficSources; track source.name) {
+                          <li class="flex items-center justify-between gap-6">
+                            <span class="flex items-center gap-2">
+                              <span class="h-2.5 w-2.5 rounded-full" [style.background]="source.color"></span>
+                              {{ source.name }}
+                            </span>
+                            <strong>{{ source.percent }}%</strong>
+                          </li>
+                        }
+                      </ul>
+                    </div>
+                  </article>
+
+                  <article class="rounded-xl border bg-card p-4 shadow-sm sm:p-6">
+                    <h2 class="font-semibold">Monthly Goals</h2>
+                    <p class="text-sm text-muted-foreground">Track progress toward target KPIs.</p>
+
+                    <div class="mt-4 space-y-4">
+                      <div>
+                        <div class="mb-1 flex items-center justify-between text-sm">
+                          <span class="font-medium">Revenue target</span>
+                          <span>{{ monthlyGoalProgress }}%</span>
+                        </div>
+                        <div class="h-2 rounded-full bg-muted">
+                          <div class="h-2 rounded-full bg-chart-1" [style.width.%]="monthlyGoalProgress"></div>
+                        </div>
+                      </div>
+                    </div>
+                  </article>
+                </div>
+              </section>
+
+              <section class="rounded-xl border bg-card p-4 shadow-sm sm:p-6">
+                <h2 class="font-semibold">Recent Activity</h2>
+                <p class="text-sm text-muted-foreground">Latest operational updates across clients and finance.</p>
+
+                <ul class="mt-4 space-y-3">
+                  @for (item of recentActivity; track item.id) {
+                    <li class="flex flex-col gap-2 rounded-lg border p-3 sm:flex-row sm:items-center sm:justify-between">
+                      <div class="space-y-1">
+                        <p class="font-medium">{{ item.title }}</p>
+                        <p class="text-sm text-muted-foreground">{{ item.description }}</p>
+                      </div>
+
+                      <div class="flex items-center gap-3">
+                        <span class="text-xs text-muted-foreground">{{ item.timestamp }}</span>
+                        <span
+                          class="rounded-full px-2.5 py-1 text-xs font-medium"
+                          [class.bg-emerald-100]="item.status === 'Paid' || item.status === 'Approved'"
+                          [class.text-emerald-700]="item.status === 'Paid' || item.status === 'Approved'"
+                          [class.bg-sky-100]="item.status === 'Sent'"
+                          [class.text-sky-700]="item.status === 'Sent'"
+                          [class.bg-amber-100]="item.status === 'Pending'"
+                          [class.text-amber-700]="item.status === 'Pending'"
+                        >
+                          {{ item.status }}
+                        </span>
+                      </div>
+                    </li>
+                  }
+                </ul>
+              </section>
+            </main>
+          }
         </div>
       </div>
     </div>
@@ -362,7 +373,9 @@ interface RecentActivityItem {
 })
 export class BusinessDashboardComponent {
   private readonly platformId = inject(PLATFORM_ID);
+  private readonly route = inject(ActivatedRoute);
   private readonly storageKey = 'business-portal-theme';
+  protected readonly activeView = signal<'dashboard' | 'client-invite-onboard' | 'client-list'>('dashboard');
   protected readonly sidebarCollapsed = signal(false);
   protected readonly expandedSidebarSections = signal<ReadonlySet<string>>(
     new Set([
@@ -380,6 +393,15 @@ export class BusinessDashboardComponent {
   protected readonly monthlyGoalProgress = 88;
 
   constructor() {
+    const initialView = this.route.snapshot.data['initialView'] as
+      | 'dashboard'
+      | 'client-invite-onboard'
+      | 'client-list'
+      | undefined;
+    if (initialView !== undefined) {
+      this.activeView.set(initialView);
+    }
+
     this.initializeTheme();
   }
 
@@ -702,6 +724,19 @@ export class BusinessDashboardComponent {
     const nextValue = !this.isDark();
     this.isDark.set(nextValue);
     this.applyTheme(nextValue);
+  }
+
+  protected onSidebarItemClick(event: Event, itemId: string): void {
+    if (itemId !== 'dashboard' && itemId !== 'client-invite-onboard' && itemId !== 'client-list') {
+      return;
+    }
+
+    event.preventDefault();
+    this.activeView.set(itemId);
+  }
+
+  protected isItemActive(itemId: string): boolean {
+    return this.activeView() === itemId;
   }
 
   private initializeTheme(): void {

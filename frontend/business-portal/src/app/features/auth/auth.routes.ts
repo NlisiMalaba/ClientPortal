@@ -20,6 +20,17 @@ export const AUTH_ROUTES: Routes = [
     },
   },
   {
+    path: 'accept-invitation',
+    loadComponent: () =>
+      import('./accept-invitation-screen.component').then(
+        (m) => m.AcceptInvitationScreenComponent,
+      ),
+    data: {
+      title: 'Accept invitation',
+      description: 'Set account password from an invitation link.',
+    },
+  },
+  {
     path: 'forgot-password',
     loadComponent: () =>
       import('../feature-shell/feature-shell.component').then(

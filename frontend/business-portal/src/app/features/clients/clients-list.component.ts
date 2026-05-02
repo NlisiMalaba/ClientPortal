@@ -1,7 +1,7 @@
 import { ChangeDetectionStrategy, Component, computed, inject } from '@angular/core';
 import { FormBuilder, ReactiveFormsModule } from '@angular/forms';
 import { toSignal } from '@angular/core/rxjs-interop';
-import { RouterLink } from '@angular/router';
+import { Router, RouterLink } from '@angular/router';
 import { startWith } from 'rxjs';
 
 import { ButtonComponent } from '@/components/ui/button.component';
@@ -19,7 +19,6 @@ import {
 } from '@/components/ui/data-table.component';
 import { InputComponent } from '@/components/ui/input.component';
 import { SelectComponent, SelectOption } from '@/components/ui/select.component';
-import { ToastNotificationService } from '@/app/core/notifications/toast-notification.service';
 
 interface ClientRow extends DataTableRow {
   readonly id: string;
@@ -78,7 +77,7 @@ interface ClientRow extends DataTableRow {
               <ui-button
                 class="w-full md:w-auto"
                 label="Invite Client"
-                (clicked)="onInviteClient()"
+                (clicked)="goToInviteOnboarding()"
               />
             </form>
 
@@ -112,7 +111,7 @@ interface ClientRow extends DataTableRow {
 })
 export class ClientsListComponent {
   private readonly formBuilder = inject(FormBuilder);
-  private readonly toast = inject(ToastNotificationService);
+  private readonly router = inject(Router);
 
   protected readonly filtersForm = this.formBuilder.nonNullable.group({
     searchTerm: [''],
@@ -197,7 +196,7 @@ export class ClientsListComponent {
     });
   });
 
-  protected onInviteClient(): void {
-    this.toast.info('Invite client flow will be connected in the next task.');
+  protected goToInviteOnboarding(): void {
+    void this.router.navigate(['/clients/invite-onboarding']);
   }
 }

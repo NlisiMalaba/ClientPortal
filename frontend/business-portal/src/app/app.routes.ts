@@ -20,8 +20,32 @@ export const routes: Routes = [
   {
     path: 'clients',
     canActivate: [authGuard, tenantGuard],
-    loadChildren: () =>
-      import('./features/clients/clients.routes').then((m) => m.CLIENTS_ROUTES),
+    loadComponent: () =>
+      import('./features/dashboard/business-dashboard.component').then(
+        (m) => m.BusinessDashboardComponent,
+      ),
+    data: {
+      initialView: 'client-list',
+    },
+  },
+  {
+    path: 'clients/invite-onboarding',
+    canActivate: [authGuard, tenantGuard],
+    loadComponent: () =>
+      import('./features/dashboard/business-dashboard.component').then(
+        (m) => m.BusinessDashboardComponent,
+      ),
+    data: {
+      initialView: 'client-invite-onboard',
+    },
+  },
+  {
+    path: 'clients/:clientId',
+    canActivate: [authGuard, tenantGuard],
+    loadComponent: () =>
+      import('./features/clients/client-detail.component').then(
+        (m) => m.ClientDetailComponent,
+      ),
   },
   {
     path: 'projects',

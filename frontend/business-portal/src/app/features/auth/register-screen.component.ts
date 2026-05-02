@@ -27,11 +27,11 @@ import {
 } from '@/components/ui/card.component';
 import { InputComponent } from '@/components/ui/input.component';
 import {
-  ApiEnvelope,
   AuthApiService,
   RegisterBusinessRequest,
   RegisterBusinessResult,
 } from '@/app/core/api/services/auth-api.service';
+import { ApiEnvelope } from '@/app/core/api/models';
 import { ToastNotificationService } from '@/app/core/notifications/toast-notification.service';
 
 function passwordsMatchValidator(group: AbstractControl): ValidationErrors | null {
@@ -323,7 +323,7 @@ function formatEnvelopeErrors(
   if (!envelope.errors?.length) {
     return null;
   }
-  return envelope.errors.map((e) => e.message).filter(Boolean).join(' ');
+  return envelope.errors.map((e: { message: string }) => e.message).filter(Boolean).join(' ');
 }
 
 function formatHttpError(error: unknown): string {
