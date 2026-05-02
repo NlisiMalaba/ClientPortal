@@ -31,7 +31,14 @@ public sealed class UserAuthenticationRepository : IUserAuthenticationRepository
 
         if (_currentTenant.IsResolved && !string.IsNullOrWhiteSpace(_currentTenant.Slug))
         {
-            return await FindUserByEmailInTenantAsync(_currentTenant.Slug!, emailValue, cancellationToken);
+            string resolvedSlug = _currentTenant.Slug!;
+            User? user = await FindUserByEmailInTenantAsync(resolvedSlug, emailValue, cancellationToken);
+            if (user is not null)
+            {
+                TenantResolutionContext.SetSlug(resolvedSlug);
+            }
+
+            return user;
         }
 
         List<string> slugs = await ActiveTenantSlugsAsync(cancellationToken);
@@ -62,7 +69,14 @@ public sealed class UserAuthenticationRepository : IUserAuthenticationRepository
 
         if (_currentTenant.IsResolved && !string.IsNullOrWhiteSpace(_currentTenant.Slug))
         {
-            return await FindUserByIdInTenantAsync(_currentTenant.Slug!, userId, cancellationToken);
+            string resolvedSlug = _currentTenant.Slug!;
+            User? user = await FindUserByIdInTenantAsync(resolvedSlug, userId, cancellationToken);
+            if (user is not null)
+            {
+                TenantResolutionContext.SetSlug(resolvedSlug);
+            }
+
+            return user;
         }
 
         List<string> slugs = await ActiveTenantSlugsAsync(cancellationToken);
@@ -113,9 +127,10 @@ public sealed class UserAuthenticationRepository : IUserAuthenticationRepository
         CancellationToken cancellationToken)
     {
         await using TenantDbContext dbContext = CreateDb(slug);
+        EmailAddress targetEmail = new(email);
         return await dbContext.Set<User>()
             .AsNoTracking()
-            .SingleOrDefaultAsync(u => u.Email.Value == email, cancellationToken);
+            .SingleOrDefaultAsync(u => u.Email == targetEmail, cancellationToken);
     }
 
     private async Task<User?> FindUserByIdInTenantAsync(
