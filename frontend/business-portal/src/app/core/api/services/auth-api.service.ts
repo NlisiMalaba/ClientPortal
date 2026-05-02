@@ -1,5 +1,5 @@
 import { Injectable } from '@angular/core';
-import { Observable } from 'rxjs';
+import { Observable, map } from 'rxjs';
 
 import { ApiClientService } from '../api-client.service';
 import { ApiOperationResult } from '../models';
@@ -12,8 +12,14 @@ export interface LoginRequest {
 
 export interface LoginResponse {
   accessToken: string;
-  refreshToken: string;
-  expiresAtUtc: string;
+  expiresAt: string;
+  user: {
+    id: string;
+    email: string;
+    fullName: string;
+    role: number;
+    isActive: boolean;
+  };
 }
 
 export interface RefreshRequest {
@@ -73,24 +79,41 @@ export class AuthApiService {
   constructor(private readonly apiClient: ApiClientService) {}
 
   login(request: LoginRequest): Observable<LoginResponse> {
-    return this.apiClient.post<LoginResponse, LoginRequest>(
-      `${this.basePath}/login`,
-      request,
-    );
+    return this.apiClient
+      .post<ApiEnvelope<LoginResponse>, LoginRequest>(
+        `${this.basePath}/login`,
+        request,
+        undefined,
+        { withCredentials: true },
+      )
+      .pipe(map((response) => this.unwrapEnvelopeData(response)));
   }
 
-  refresh(request: RefreshRequest): Observable<LoginResponse> {
-    return this.apiClient.post<LoginResponse, RefreshRequest>(
-      `${this.basePath}/refresh`,
-      request,
-    );
+  refresh(request?: RefreshRequest): Observable<LoginResponse> {
+    return this.apiClient
+      .post<ApiEnvelope<LoginResponse>, RefreshRequest | undefined>(
+        `${this.basePath}/refresh`,
+        request,
+        undefined,
+        { withCredentials: true },
+      )
+      .pipe(map((response) => this.unwrapEnvelopeData(response)));
   }
 
-  logout(refreshToken: string): Observable<ApiOperationResult> {
-    return this.apiClient.post<ApiOperationResult, RefreshRequest>(
-      `${this.basePath}/logout`,
-      { refreshToken },
-    );
+  logout(refreshToken?: string): Observable<ApiOperationResult> {
+    const requestBody =
+      typeof refreshToken === 'string' && refreshToken.trim() !== ''
+        ? ({ refreshToken } satisfies RefreshRequest)
+        : undefined;
+
+    return this.apiClient
+      .post<ApiEnvelope<object | null>, RefreshRequest | undefined>(
+        `${this.basePath}/logout`,
+        requestBody,
+        undefined,
+        { withCredentials: true },
+      )
+      .pipe(map((response) => this.toOperationResult(response)));
   }
 
   register(
@@ -123,5 +146,21 @@ export class AuthApiService {
       `${this.basePath}/accept-invitation`,
       request,
     );
+  }
+
+  private unwrapEnvelopeData<T>(response: ApiEnvelope<T>): T {
+    if (response.success && response.data !== null) {
+      return response.data;
+    }
+
+    const firstError = response.errors[0]?.message;
+    throw new Error(firstError ?? 'Authentication request failed.');
+  }
+
+  private toOperationResult(response: ApiEnvelope<object | null>): ApiOperationResult {
+    return {
+      success: response.success,
+      message: response.errors[0]?.message,
+    };
   }
 }

@@ -24,6 +24,10 @@ export class TokenStorageService {
     localStorage.setItem(this.config.refreshTokenStorageKey, refreshToken);
   }
 
+  clearRefreshToken(): void {
+    localStorage.removeItem(this.config.refreshTokenStorageKey);
+  }
+
   clear(): void {
     localStorage.removeItem(this.config.accessTokenStorageKey);
     localStorage.removeItem(this.config.refreshTokenStorageKey);
