@@ -1,5 +1,6 @@
 using Application.Abstractions;
 using Domain;
+using Infrastructure.Persistence.Configurations;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Metadata;
 using Microsoft.Extensions.Configuration;
@@ -47,7 +48,11 @@ public sealed class TenantDbContext : DbContext
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
-        modelBuilder.HasDefaultSchema(GetTenantSchema());
+        // Do not call HasDefaultSchema with the tenant slug: migration snapshots would bake in
+        // design-time schema (e.g. tenant_design_time) while runtime uses tenant_{slug}, which
+        // triggers PendingModelChangesWarning on MigrateAsync. PostgreSQL resolves unqualified
+        // identifiers via connection SearchPath (set per tenant in OnConfiguring).
+        modelBuilder.ApplyConfiguration(new UserConfiguration());
         ConfigureNotificationPreferences(modelBuilder);
         ApplySnakeCaseConventions(modelBuilder);
     }
