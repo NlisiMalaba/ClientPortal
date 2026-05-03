@@ -86,6 +86,11 @@ public sealed class TenantDbContext : DbContext
 
             foreach (IMutableProperty property in entity.GetProperties())
             {
+                if (property.Name.StartsWith("_", StringComparison.Ordinal))
+                {
+                    continue;
+                }
+
                 property.SetColumnName(ToSnakeCase(property.Name));
             }
 
