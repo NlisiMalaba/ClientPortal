@@ -75,6 +75,8 @@ builder.Services.AddAuthentication(JwtBearerDefaults.AuthenticationScheme)
         string publicKeyPem = jwtSection["PublicKeyPem"] ?? string.Empty;
 
         RsaSecurityKey publicKey = JwtRsaKeyFactory.CreatePublicKey(publicKeyPem);
+        // Preserve JWT claim names (tenantSlug, role, …) so policies match TokenValidationParameters.RoleClaimType.
+        options.MapInboundClaims = false;
         options.TokenValidationParameters = new TokenValidationParameters
         {
             ValidateIssuerSigningKey = true,
@@ -195,6 +197,7 @@ builder.Services.AddScoped<ITenantDomainLookup, NullTenantDomainLookup>();
 builder.Services.AddScoped<ITenantResolver, SubdomainTenantResolver>();
 builder.Services.AddScoped<ITenantResolver, CustomDomainTenantResolver>();
 builder.Services.AddScoped<ITenantResolver, TenantKeyTenantResolver>();
+builder.Services.AddScoped<ITenantResolver, PublicIdHeaderTenantResolver>();
 builder.Services.AddScoped<TenantMiddleware>();
 builder.Services.AddSingleton<IAuthorizationHandler, TenantAccessAuthorizationHandler>();
 

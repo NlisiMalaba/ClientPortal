@@ -75,9 +75,11 @@ public static class DependencyInjection
         services.Configure<ContractNotificationOptions>(configuration.GetSection(ContractNotificationOptions.SectionName));
         services.Configure<MessageAttachmentUploadOptions>(configuration.GetSection(MessageAttachmentUploadOptions.SectionName));
         services.Configure<TenantKeyOptions>(configuration.GetSection(TenantKeyOptions.SectionName));
+        services.Configure<TenantPublicIdHeaderOptions>(configuration.GetSection(TenantPublicIdHeaderOptions.SectionName));
         services.AddSingleton<ITenantKeyGenerator, TenantKeyGenerator>();
         services.AddScoped<ITenantKeyHasher, TenantKeyHasher>();
         services.AddScoped<ITenantKeyLookup, NpgsqlTenantKeyLookup>();
+        services.AddScoped<ITenantPublicIdLookup, NpgsqlTenantPublicIdLookup>();
         services.AddDbContext<TenantDbContext>();
         services.AddDbContext<PublicDbContext>();
         services.AddScoped<IDomainEventDispatcher, DomainEventDispatcher>();

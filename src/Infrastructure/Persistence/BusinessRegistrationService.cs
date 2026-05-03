@@ -97,6 +97,7 @@ public sealed class BusinessRegistrationService : IBusinessRegistrationService
             await _publicDbContext.SaveChangesAsync(cancellationToken);
             publicTenantCommitted = true;
 
+            // Apply full tenant migration history so all tenant tables exist before inserting the owner user.
             await _tenantProvisioner.CreateSchemaAsync(tenant.Slug, cancellationToken);
 
             ICurrentTenant provisioningTenant = new SlugCurrentTenant(tenant.Slug);
