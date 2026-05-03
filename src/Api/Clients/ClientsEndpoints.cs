@@ -55,12 +55,12 @@ public static class ClientsEndpoints
     }
 
     private static async Task<IResult> GetClientsAsync(
-        int page,
-        int pageSize,
-        string? search,
-        ClientStatus? status,
         ISender sender,
-        CancellationToken cancellationToken)
+        CancellationToken cancellationToken,
+        int page = 1,
+        int pageSize = 20,
+        string? search = null,
+        ClientStatus? status = null)
     {
         int normalizedPage = page <= 0 ? 1 : page;
         int normalizedPageSize = pageSize <= 0 ? 20 : pageSize;

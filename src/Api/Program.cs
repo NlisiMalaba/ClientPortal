@@ -32,6 +32,7 @@ using Microsoft.AspNetCore.RateLimiting;
 using Microsoft.AspNetCore.SignalR;
 using Microsoft.Extensions.Diagnostics.HealthChecks;
 using Microsoft.Extensions.Logging;
+using Microsoft.Extensions.Primitives;
 using Microsoft.IdentityModel.Tokens;
 using Microsoft.OpenApi;
 using Scalar.AspNetCore;
@@ -89,6 +90,24 @@ builder.Services.AddAuthentication(JwtBearerDefaults.AuthenticationScheme)
             ClockSkew = TimeSpan.Zero,
             NameClaimType = "userId",
             RoleClaimType = "role"
+        };
+        options.Events = new JwtBearerEvents
+        {
+            OnMessageReceived = context =>
+            {
+                HttpRequest request = context.Request;
+                if (request.Query.TryGetValue("access_token", out StringValues token))
+                {
+                    string? accessToken = token.FirstOrDefault();
+                    if (!string.IsNullOrWhiteSpace(accessToken) &&
+                        request.Path.StartsWithSegments("/hubs"))
+                    {
+                        context.Token = accessToken;
+                    }
+                }
+
+                return Task.CompletedTask;
+            }
         };
     });
 builder.Services.AddSingleton<IAuthorizationMiddlewareResultHandler, DocsAnonymousAuthorizationMiddlewareResultHandler>();
@@ -194,6 +213,7 @@ builder.Services.AddSingleton<IConnectionPresenceTracker, ConnectionPresenceTrac
 builder.Services.AddSingleton<IUserPresenceService, ConnectionPresenceService>();
 builder.Services.AddSingleton<IHubFilter, MessagesHubGuardFilter>();
 builder.Services.AddScoped<ITenantDomainLookup, NullTenantDomainLookup>();
+builder.Services.AddScoped<ITenantResolver, JwtClaimsTenantResolver>();
 builder.Services.AddScoped<ITenantResolver, SubdomainTenantResolver>();
 builder.Services.AddScoped<ITenantResolver, CustomDomainTenantResolver>();
 builder.Services.AddScoped<ITenantResolver, TenantKeyTenantResolver>();
@@ -273,9 +293,9 @@ app.UseSerilogRequestLogging(options =>
 });
 app.UseHttpsRedirection();
 app.UseCors(CorsPolicyNames.Default);
+app.UseAuthentication();
 app.UseMiddleware<TenantMiddleware>();
 app.UseRateLimiter();
-app.UseAuthentication();
 app.UseAuthorization();
 
 app.UseHangfireDashboard(
