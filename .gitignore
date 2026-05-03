@@ -52,7 +52,8 @@ Thumbs.db
 
 .tmp-build/
 .env
+.docker/jwt-temp/
 
-# App settings: machine-specific and environment files (keep appsettings.json in repo)
+# App settings: not committed (use local files, user secrets, or examples in docs)
 **/appsettings.json
-**/appsettings.*.json"
+**/appsettings.*.json

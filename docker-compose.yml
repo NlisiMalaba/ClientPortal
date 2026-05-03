@@ -72,6 +72,8 @@ services:
       ConnectionStrings__Postgres: ${ConnectionStrings__Postgres}
       ConnectionStrings__Redis: ${ConnectionStrings__Redis}
       Serilog__WriteTo__1__Args__serverUrl: ${Serilog__WriteTo__1__Args__serverUrl}
+      Jwt__PrivateKeyPem: ${Jwt__PrivateKeyPem}
+      Jwt__PublicKeyPem: ${Jwt__PublicKeyPem}
     ports:
       - "${API_PORT}:5000"
     networks:

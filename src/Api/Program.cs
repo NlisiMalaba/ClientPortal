@@ -88,6 +88,8 @@ builder.Services.AddAuthentication(JwtBearerDefaults.AuthenticationScheme)
             RoleClaimType = "role"
         };
     });
+builder.Services.AddSingleton<IAuthorizationMiddlewareResultHandler, DocsAnonymousAuthorizationMiddlewareResultHandler>();
+
 builder.Services.AddAuthorization(options =>
 {
     options.FallbackPolicy = new AuthorizationPolicyBuilder()
@@ -240,19 +242,6 @@ using (IServiceScope scope = app.Services.CreateScope())
 }
 
 // Configure the HTTP request pipeline.
-if (app.Environment.IsDevelopment())
-{
-    app.MapOpenApi("/openapi/{documentName}.json")
-        .AllowAnonymous();
-    app.MapScalarApiReference("/scalar/v1", options =>
-        {
-            options.Title = "ClientPortal API";
-            options.OpenApiRoutePattern = "/openapi/{documentName}.json";
-            options.DefaultHttpClient = new(ScalarTarget.CSharp, ScalarClient.HttpClient);
-        })
-        .AllowAnonymous();
-}
-
 app.UseExceptionHandler();
 app.UseSerilogRequestLogging(options =>
 {
@@ -278,6 +267,7 @@ app.UseMiddleware<TenantMiddleware>();
 app.UseRateLimiter();
 app.UseAuthentication();
 app.UseAuthorization();
+
 app.UseHangfireDashboard(
     "/hangfire",
     new DashboardOptions
@@ -286,6 +276,20 @@ app.UseHangfireDashboard(
     });
 app.MapHealthChecks("/health", new HealthCheckOptions())
     .AllowAnonymous();
+
+if (app.Environment.IsDevelopment())
+{
+    app.MapOpenApi("/openapi/{documentName}.json")
+        .AllowAnonymous();
+    app.MapScalarApiReference("/scalar/v1", options =>
+        {
+            options.Title = "ClientPortal API";
+            options.OpenApiRoutePattern = "/openapi/{documentName}.json";
+            options.DefaultHttpClient = new(ScalarTarget.CSharp, ScalarClient.HttpClient);
+        })
+        .AllowAnonymous();
+}
+
 app.MapAuthEndpoints();
 app.MapClientsEndpoints();
 app.MapProjectsEndpoints();

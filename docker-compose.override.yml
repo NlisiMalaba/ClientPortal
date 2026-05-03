@@ -9,6 +9,17 @@ services:
              dotnet run --no-launch-profile --urls http://0.0.0.0:5000"
     volumes:
       - ./:/src
+      # Hide Win-mounted bin/obj so Linux MSBuild can write outputs (fixes Access denied / 502 → Scalar).
+      - /src/src/Api/bin
+      - /src/src/Api/obj
+      - /src/src/Application/bin
+      - /src/src/Application/obj
+      - /src/src/Domain/bin
+      - /src/src/Domain/obj
+      - /src/src/Infrastructure/bin
+      - /src/src/Infrastructure/obj
+      - /src/src/Shared/bin
+      - /src/src/Shared/obj
       - ${USERPROFILE}/.nuget/packages:/root/.nuget/packages
       - ${APPDATA}/Microsoft/UserSecrets:/root/.microsoft/usersecrets:ro
       - ${USERPROFILE}/.aspnet/https:/https:ro
